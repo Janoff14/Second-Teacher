@@ -42,6 +42,9 @@ npm run dev
 
 Public URL example: `https://second-teacher-production.up.railway.app`
 
+**Smoke-test production** (from `backend/`, after deploy):  
+`API_BASE_URL=https://…up.railway.app npm run smoke-deploy` — checks `GET /health` and `POST /auth/login` (default seed admin; override with `SMOKE_EMAIL` / `SMOKE_PASSWORD`).
+
 ## Cursor: Railway MCP
 
 Project MCP config: [`.cursor/mcp.json`](.cursor/mcp.json) registers `@railway/mcp-server` so you can manage projects/services from Cursor. After editing, reload MCP servers in Cursor if needed.
