@@ -1,0 +1,9 @@
+# Railway / Nixpacks (root directory = backend)
+# https://nixpacks.com/docs/configuration/file
+
+[variables]
+NIXPACKS_NODE_VERSION = "22"
+
+# Default `npm ci` in production omits devDependencies, but we need `typescript` + types to run `tsc`.
+[phases.install]
+cmds = ["npm ci --include=dev"]

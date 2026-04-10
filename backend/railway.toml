@@ -1,8 +1,11 @@
 # Railway: set the service "Root Directory" to `backend` in the dashboard (or monorepo settings).
 # https://docs.railway.com/deploy/deployments
+#
+# Node 22 + devDependencies during install are configured in nixpacks.toml (Vitest/TS need Node 20+).
 
 [build]
 builder = "nixpacks"
+nixpacksConfigPath = "nixpacks.toml"
 
 [deploy]
 startCommand = "npm start"

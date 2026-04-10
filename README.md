@@ -49,5 +49,8 @@ Project MCP config: [`.cursor/mcp.json`](.cursor/mcp.json) registers `@railway/m
 ## Credentials checklist
 
 - **Today (API as shipped):** `JWT_SECRET`, `CORS_ORIGIN`, Railway `PORT` (injected).
-- **When adding OpenAI:** `OPENAI_API_KEY` in Railway + `backend/.env` locally; keep it out of git.
-- **Future Postgres/Redis:** add connection URLs as Railway variables and read them in `backend/src/config/env.ts`.
+- **When adding OpenAI:** `OPENAI_API_KEY` in Railway + `backend/.env` locally; keep it out of git. Never paste keys into chat or commit them.
+- **Smoke-test an API key (local):** from `backend/`, put the key in `.env`, then run `npm run verify-openai`. Optionally set `OPENAI_SMOKE_MODEL` if the default model is not enabled for your org.
+- **Supabase:** set `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `backend/.env` when you connect DB/Auth/Storage. Use `SUPABASE_SERVICE_ROLE_KEY` only for trusted server code (bypasses RLS). Helpers: `backend/src/lib/supabase.ts`. The package `@supabase/ssr` is for a future Next.js UI; this Express API uses `@supabase/supabase-js` only.
+- **Supabase agent skills (optional):** from repo root, non-interactive install: `npx skills add supabase/agent-skills -y` (or `-g` for global).
+- **Future Postgres/Redis:** Supabase can replace ad-hoc DB URLs; otherwise add connection strings in Railway and extend `backend/src/config/env.ts`.
