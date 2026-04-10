@@ -9,7 +9,7 @@ GitHub: [Janoff14/Second-Teacher](https://github.com/Janoff14/Second-Teacher)
 |------|---------|
 | **`backend/`** | REST API — run `npm install`, `npm run build`, `npm start` here |
 | **`frontend/`** | Placeholder for the web app (not scaffolded yet) |
-| **`docs/`** | PRD, architecture, epics, sprint status |
+| **`docs/`** | PRD, architecture, epics, sprint status, **[API guide for frontend](docs/api-for-frontend.md)** |
 
 ## Local backend
 
