@@ -1,0 +1,11 @@
+# Railway: set the service "Root Directory" to `backend` in the dashboard (or monorepo settings).
+# https://docs.railway.com/deploy/deployments
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "npm start"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"

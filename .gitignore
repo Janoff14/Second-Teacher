@@ -10,3 +10,14 @@ Thumbs.db
 # Logs / caches
 *.log
 .cache/
+
+# Node build artifacts
+node_modules/
+dist/
+coverage/
+
+# Frontend (when added)
+frontend/node_modules/
+frontend/dist/
+frontend/.next/
+frontend/out/
