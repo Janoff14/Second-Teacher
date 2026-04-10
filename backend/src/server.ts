@@ -9,7 +9,15 @@ async function start() {
   await seedDefaultUsers();
   const app = createApp();
   app.listen(env.PORT, LISTEN_HOST, () => {
-    logger.info({ port: env.PORT, host: LISTEN_HOST, env: env.NODE_ENV }, "server_started");
+    logger.info(
+      {
+        port: env.PORT,
+        host: LISTEN_HOST,
+        env: env.NODE_ENV,
+        envPort: process.env.PORT ?? null,
+      },
+      "server_started",
+    );
   });
 }
 

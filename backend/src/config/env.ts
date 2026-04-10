@@ -7,7 +7,8 @@ const emptyToUndefined = (v: unknown) => (v === "" || v === undefined ? undefine
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
-  PORT: z.coerce.number().int().positive().default(4000),
+  /** Railway sets PORT; avoid defining PORT in service variables unless it matches Networking → target port. */
+  PORT: z.preprocess(emptyToUndefined, z.coerce.number().int().positive().default(4000)),
   JWT_SECRET: z.string().min(16).default("dev-only-jwt-secret-change-me"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
