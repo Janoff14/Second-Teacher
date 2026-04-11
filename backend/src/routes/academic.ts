@@ -2,6 +2,8 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   assignTeacher,
+  canTeacherAccessSubject,
+  canTeacherManageGroup,
   createGroup,
   createJoinCode,
   createSubject,
@@ -42,6 +44,43 @@ academicRouter.post(
 
 academicRouter.get("/subjects", requireAuth, requireRole(["admin", "teacher"]), (_req, res) => {
   res.status(200).json({ data: listSubjects() });
+});
+
+/**
+ * Teacher dashboard: subjects the caller may access, each with groups they may manage.
+ * Admins receive every subject that has at least one group.
+ */
+academicRouter.get("/teacher/academic-scope", requireAuth, requireRole(["admin", "teacher"]), (req, res) => {
+  const user = req.user!;
+  const allSubjects = listSubjects();
+  const allGroups = listGroups();
+
+  type Block = { subject: (typeof allSubjects)[0]; groups: typeof allGroups };
+  const blocks: Block[] = [];
+
+  if (user.role === "admin") {
+    for (const subject of allSubjects) {
+      const groups = allGroups.filter((g) => g.subjectId === subject.id);
+      if (groups.length > 0) {
+        blocks.push({ subject, groups });
+      }
+    }
+    res.status(200).json({ data: { subjects: blocks } });
+    return;
+  }
+
+  for (const subject of allSubjects) {
+    if (!canTeacherAccessSubject(user.userId, user.role, subject.id)) {
+      continue;
+    }
+    const groups = allGroups.filter(
+      (g) => g.subjectId === subject.id && canTeacherManageGroup(user.userId, user.role, g.id),
+    );
+    if (groups.length > 0) {
+      blocks.push({ subject, groups });
+    }
+  }
+  res.status(200).json({ data: { subjects: blocks } });
 });
 
 const createGroupSchema = z.object({

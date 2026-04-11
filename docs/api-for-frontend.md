@@ -136,6 +136,7 @@ All require auth; roles as noted.
 | GET | `/subjects` | admin, teacher | — | **200** `{ data: subject[] }` |
 | POST | `/groups` | admin, teacher | `{ "subjectId", "name" (min 2) }` | **201** `{ data: group }` |
 | GET | `/groups` | admin, teacher | — | **200** `{ data: group[] }` |
+| GET | `/teacher/academic-scope` | admin, teacher | — | **200** `{ data: { subjects: { subject, groups[] }[] } }` — each block lists groups the teacher may manage (creator or assigned); admins get every subject that has groups |
 | POST | `/groups/:groupId/assign-teacher` | admin | `{ "teacherId" }` | **201** `{ data: assignment }` |
 | POST | `/groups/:groupId/join-codes` | admin, teacher | `{ "ttlHours"?: number }` (optional positive int, max ~720) | **201** `{ data: { code, groupId, expiresAt } }` |
 | POST | `/groups/:groupId/join-codes/revoke` | admin, teacher | `{ "code" (min 6) }` | **200** `{ data: { code, revokedAt } }` |
@@ -165,8 +166,14 @@ Teachers can only manage groups they created or are assigned to (enforced server
 |--------|------|-------|------|--------|
 | POST | `/rag/sources/textbooks` | admin, teacher | `{ "subjectId", "title", "versionLabel", "text" }` | **201** `{ data: … }` |
 | POST | `/rag/query` | admin, teacher, student | `{ "query" (min 2), "groupId", "topK"?: 1–20 }` | **200** `{ data: hits }` |
+| GET | `/reader/textbooks/:textbookSourceId` | admin, teacher, student | Query: **`groupId` required**, optional `paragraphId`, `sentenceStart`, `sentenceEnd` | **200** `{ data: { source, chapters, paragraphs, focus } }` |
 
 Students and teachers may only query groups they belong to or manage.
+
+`/rag/query` textbook hits now include citation metadata for deep links:
+- `citation.readerPath` (relative reader URL)
+- `citation.textbookLocation` (`chapterNumber`, `chapterTitle`, `pageNumber`, `paragraphId`, `sentenceStart`, `sentenceEnd`)
+- `citation.highlightText` (text chunk to highlight)
 
 ---
 

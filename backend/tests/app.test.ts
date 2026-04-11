@@ -87,6 +87,42 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     );
   });
 
+  it("returns teacher academic scope with owned subjects and groups", async () => {
+    const app = createApp();
+    const loginRes = await request(app)
+      .post("/auth/login")
+      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+    const token = loginRes.body.data.token as string;
+
+    const emptyScope = await request(app)
+      .get("/teacher/academic-scope")
+      .set("Authorization", `Bearer ${token}`);
+    expect(emptyScope.status).toBe(200);
+    expect(emptyScope.body.data.subjects).toEqual([]);
+
+    const subjectRes = await request(app)
+      .post("/subjects")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ name: "Scope Test Subject" });
+    expect(subjectRes.status).toBe(201);
+    const subjectId = subjectRes.body.data.id as string;
+
+    const groupRes = await request(app)
+      .post("/groups")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ subjectId, name: "Scope Test Group" });
+    expect(groupRes.status).toBe(201);
+
+    const scope = await request(app)
+      .get("/teacher/academic-scope")
+      .set("Authorization", `Bearer ${token}`);
+    expect(scope.status).toBe(200);
+    const blocks = scope.body.data.subjects as Array<{ subject: { id: string }; groups: Array<{ id: string }> }>;
+    expect(blocks.length).toBe(1);
+    expect(blocks[0].subject.id).toBe(subjectId);
+    expect(blocks[0].groups.length).toBe(1);
+  });
+
   it("blocks user without required role", async () => {
     const app = createApp();
     const loginRes = await request(app)

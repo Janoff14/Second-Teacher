@@ -25,6 +25,7 @@ import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { resetAuditStoreForTest } from "../domain/auditStore";
 import {
+  assignTeacher,
   createEnrollment,
   createGroup,
   createJoinCode,
@@ -396,6 +397,13 @@ export async function seedDemoDataset(options?: SeedDemoDatasetOptions): Promise
       byKind[spec.kind] += 1;
     }
     versionsBySection.push(sectionVersions);
+  }
+
+  const legacyDemoTeacher = await getUserByEmail("teacher@secondteacher.dev");
+  if (legacyDemoTeacher) {
+    for (const gid of groupIds) {
+      assignTeacher(gid, legacyDemoTeacher.id, teacher.id);
+    }
   }
 
   const sectionIndexByStudent: number[] = [];
