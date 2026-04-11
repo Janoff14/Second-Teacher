@@ -1,11 +1,12 @@
 import { createApp } from "./app";
 import { env } from "./config/env";
 import { logger } from "./config/logger";
-import { seedDefaultUsers } from "./domain/userStore";
+import { loadUsersFromDb, seedDefaultUsers } from "./domain/userStore";
 
 const LISTEN_HOST = process.env.HOST ?? "0.0.0.0";
 
 async function start() {
+  await loadUsersFromDb();
   await seedDefaultUsers();
   const app = createApp();
   app.listen(env.PORT, LISTEN_HOST, () => {

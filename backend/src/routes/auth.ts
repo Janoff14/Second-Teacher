@@ -37,7 +37,7 @@ const loginSchema = z.object({
 authRouter.post("/auth/login", validateBody(loginSchema), async (req, res, next) => {
   try {
     const { email, password } = req.body as { email: string; password: string };
-    const user = getUserByEmail(email);
+    const user = await getUserByEmail(email);
     if (!user) {
       throw new HttpError(401, "INVALID_CREDENTIALS", "Invalid email or password");
     }
