@@ -62,7 +62,12 @@ export async function apiRequest<T>(
       headers,
     });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Network error";
+    const raw = e instanceof Error ? e.message : "Network error";
+    const isFailedToFetch =
+      raw === "Failed to fetch" || raw.includes("NetworkError") || raw.includes("fetch");
+    const message = isFailedToFetch
+      ? "Cannot reach the API (Failed to fetch). Start the backend (e.g. cd backend && npm run dev on port 4000), set NEXT_PUBLIC_API_BASE_URL in .env.local, and ensure backend CORS_ORIGIN includes this site’s origin (localhost:3000 and 127.0.0.1:3000)."
+      : raw;
     return {
       ok: false,
       status: 0,

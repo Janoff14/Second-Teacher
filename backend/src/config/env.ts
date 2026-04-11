@@ -10,7 +10,10 @@ const envSchema = z.object({
   /** Railway sets PORT; avoid defining PORT in service variables unless it matches Networking → target port. */
   PORT: z.preprocess(emptyToUndefined, z.coerce.number().int().positive().default(4000)),
   JWT_SECRET: z.string().min(16).default("dev-only-jwt-secret-change-me"),
-  CORS_ORIGIN: z.string().default("http://localhost:3000"),
+  /** Comma-separated. Include both hostname forms so dev works whether you open :3000 via localhost or 127.0.0.1. */
+  CORS_ORIGIN: z
+    .string()
+    .default("http://localhost:3000,http://127.0.0.1:3000"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   AGENT_TOOL_TIMEOUT_MS: z.coerce.number().int().positive().default(2500),
   /** Set in Railway when you add OpenAI (chat, embeddings, etc.). */

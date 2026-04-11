@@ -24,7 +24,7 @@ npm run dev
 
 ## Local frontend + API
 
-1. Start the backend as above (`CORS_ORIGIN` should include `http://localhost:3000`).
+1. Start the backend as above. **`CORS_ORIGIN`** must include the exact origin you use for the UI (defaults now allow both `http://localhost:3000` and `http://127.0.0.1:3000`). If your `backend/.env` is older, update it or copy from `.env.example` again.
 2. In another terminal:
 
    ```bash
