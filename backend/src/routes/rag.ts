@@ -24,7 +24,7 @@ ragRouter.post(
   requireAuth,
   requireRole(["admin", "teacher"]),
   validateBody(textbookSchema),
-  (req, res, next) => {
+  async (req, res, next) => {
     try {
       const user = req.user!;
       const body = req.body as z.infer<typeof textbookSchema>;
@@ -34,7 +34,7 @@ ragRouter.post(
         err.code = "FORBIDDEN";
         throw err;
       }
-      const result = ingestTextbook({
+      const result = await ingestTextbook({
         subjectId: body.subjectId,
         title: body.title,
         versionLabel: body.versionLabel,
@@ -54,7 +54,7 @@ const querySchema = z.object({
   topK: z.number().int().min(1).max(20).optional(),
 });
 
-ragRouter.post("/rag/query", requireAuth, validateBody(querySchema), (req, res, next) => {
+ragRouter.post("/rag/query", requireAuth, validateBody(querySchema), async (req, res, next) => {
   try {
     const user = req.user!;
     const body = req.body as z.infer<typeof querySchema>;
@@ -86,7 +86,7 @@ ragRouter.post("/rag/query", requireAuth, validateBody(querySchema), (req, res, 
       throw err;
     }
 
-    const hits = queryCorpus({
+    const hits = await queryCorpus({
       query: body.query,
       groupId: body.groupId,
       subjectId: group.subjectId,

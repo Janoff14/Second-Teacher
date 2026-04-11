@@ -129,7 +129,7 @@ assessmentsRouter.post(
   requireAuth,
   requireRole(["admin", "teacher"]),
   validateBody(publishSchema),
-  (req, res, next) => {
+  async (req, res, next) => {
     try {
       const draftId = req.params.draftId;
       if (!draftId || Array.isArray(draftId)) {
@@ -156,7 +156,7 @@ assessmentsRouter.post(
       });
       const group = getGroup(version.groupId);
       if (group) {
-        indexPublishedAssessmentVersion(version, group.subjectId);
+        await indexPublishedAssessmentVersion(version, group.subjectId);
       }
       res.status(201).json({ data: version });
     } catch (e) {

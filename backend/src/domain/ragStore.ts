@@ -1,4 +1,5 @@
 import { logger } from "../config/logger";
+import { embedTexts, hasOpenAI, EMBEDDING_DIM } from "../lib/openai";
 import type { AssessmentVersion } from "./assessmentStore";
 
 export type ChunkSourceType = "textbook" | "assessment_version";
@@ -35,7 +36,9 @@ const chunks: CorpusChunk[] = [];
 let textbookSourceCounter = 1;
 let chunkCounter = 1;
 
-export function pseudoEmbed(text: string, dim = 48): number[] {
+const PSEUDO_DIM = 48;
+
+export function pseudoEmbed(text: string, dim = PSEUDO_DIM): number[] {
   const v = new Array(dim).fill(0);
   for (const word of text.toLowerCase().split(/\W+/)) {
     if (!word) {
@@ -47,13 +50,14 @@ export function pseudoEmbed(text: string, dim = 48): number[] {
     }
     v[Math.abs(h) % dim] += 1;
   }
-  const norm = Math.sqrt(v.reduce((s, x) => s + x * x, 0)) || 1;
-  return v.map((x) => x / norm);
+  const norm = Math.sqrt(v.reduce((s: number, x: number) => s + x * x, 0)) || 1;
+  return v.map((x: number) => x / norm);
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {
   let s = 0;
-  for (let i = 0; i < a.length; i++) {
+  const len = Math.min(a.length, b.length);
+  for (let i = 0; i < len; i++) {
     s += a[i]! * b[i]!;
   }
   return s;
@@ -79,11 +83,26 @@ function splitTextIntoChunks(text: string, maxLen = 480): string[] {
   return parts.filter(Boolean);
 }
 
-function runWithRetrySync<T>(label: string, attempts: number, fn: () => T): T {
+/**
+ * Embed an array of texts. Uses OpenAI when configured, otherwise falls back
+ * to the deterministic pseudo-embedding (bag-of-words hash).
+ */
+async function embed(texts: string[]): Promise<number[][]> {
+  if (hasOpenAI()) {
+    try {
+      return await embedTexts(texts);
+    } catch (err) {
+      logger.error({ err }, "openai_embed_failed_falling_back_to_pseudo");
+    }
+  }
+  return texts.map((t) => pseudoEmbed(t));
+}
+
+async function runWithRetry<T>(label: string, attempts: number, fn: () => Promise<T>): Promise<T> {
   let last: unknown;
   for (let i = 0; i < attempts; i++) {
     try {
-      return fn();
+      return await fn();
     } catch (err) {
       last = err;
       logger.warn({ err, attempt: i + 1, label }, "rag_ingest_retry");
@@ -93,23 +112,23 @@ function runWithRetrySync<T>(label: string, attempts: number, fn: () => T): T {
   throw last;
 }
 
-export function ingestTextbook(params: {
+export async function ingestTextbook(params: {
   subjectId: string;
   title: string;
   versionLabel: string;
   text: string;
   createdBy: string;
-}): { source: TextbookSourceRecord; chunksCreated: number } {
-  return runWithRetrySync("ingest_textbook", 3, () => ingestTextbookCore(params));
+}): Promise<{ source: TextbookSourceRecord; chunksCreated: number }> {
+  return runWithRetry("ingest_textbook", 3, () => ingestTextbookCore(params));
 }
 
-function ingestTextbookCore(params: {
+async function ingestTextbookCore(params: {
   subjectId: string;
   title: string;
   versionLabel: string;
   text: string;
   createdBy: string;
-}): { source: TextbookSourceRecord; chunksCreated: number } {
+}): Promise<{ source: TextbookSourceRecord; chunksCreated: number }> {
   const now = new Date().toISOString();
   const source: TextbookSourceRecord = {
     id: `tbs_${textbookSourceCounter++}`,
@@ -129,10 +148,15 @@ function ingestTextbookCore(params: {
     throw err;
   }
 
+  logger.info(
+    { sourceId: source.id, pieces: pieces.length, useOpenAI: hasOpenAI() },
+    "rag_embedding_chunks",
+  );
+  const embeddings = await embed(pieces);
+
   let created = 0;
   for (let i = 0; i < pieces.length; i++) {
     const text = pieces[i]!;
-    const embedding = pseudoEmbed(text);
     const citationAnchor = `textbook:${source.id}:${params.versionLabel}#chunk:${i}`;
     chunks.push({
       id: `chk_${chunkCounter++}`,
@@ -142,7 +166,7 @@ function ingestTextbookCore(params: {
       visibility: "subject",
       chunkIndex: i,
       text,
-      embedding,
+      embedding: embeddings[i]!,
       citationAnchor,
       active: true,
     });
@@ -164,15 +188,25 @@ export function supersedeAssessmentChunksForDraft(draftId: string, keepVersionId
   }
 }
 
-export function indexPublishedAssessmentVersion(version: AssessmentVersion, subjectId: string): number {
+export async function indexPublishedAssessmentVersion(
+  version: AssessmentVersion,
+  subjectId: string,
+): Promise<number> {
   supersedeAssessmentChunksForDraft(version.draftId, version.id);
-  let created = 0;
+
+  const texts: string[] = [];
   version.items.forEach((item, idx) => {
     const optionLines = Object.entries(item.options)
       .map(([k, v]) => `${k}: ${v}`)
       .join("\n");
-    const text = [`Item ${idx + 1}: ${item.stem}`, optionLines].join("\n");
-    const embedding = pseudoEmbed(text);
+    texts.push([`Item ${idx + 1}: ${item.stem}`, optionLines].join("\n"));
+  });
+
+  if (texts.length === 0) return 0;
+  const embeddings = await embed(texts);
+
+  let created = 0;
+  version.items.forEach((item, idx) => {
     const citationAnchor = `assessment:${version.id}:item:${item.id}`;
     chunks.push({
       id: `chk_${chunkCounter++}`,
@@ -183,8 +217,8 @@ export function indexPublishedAssessmentVersion(version: AssessmentVersion, subj
       groupId: version.groupId,
       visibility: "group",
       chunkIndex: idx,
-      text,
-      embedding,
+      text: texts[idx]!,
+      embedding: embeddings[idx]!,
       citationAnchor,
       active: true,
     });
@@ -223,21 +257,21 @@ function canAccessChunk(chunk: CorpusChunk, groupId: string, subjectId: string):
   return false;
 }
 
-export function queryCorpus(params: {
+export async function queryCorpus(params: {
   query: string;
   groupId: string;
   subjectId: string;
   topK: number;
-}): RetrievalHit[] {
+}): Promise<RetrievalHit[]> {
   const { query, groupId, subjectId, topK } = params;
-  const qEmb = pseudoEmbed(query);
+  const [qEmb] = await embed([query]);
   const scored: RetrievalHit[] = [];
 
   for (const chunk of chunks) {
     if (!canAccessChunk(chunk, groupId, subjectId)) {
       continue;
     }
-    const score = cosineSimilarity(qEmb, chunk.embedding);
+    const score = cosineSimilarity(qEmb!, chunk.embedding);
     const citation: RetrievalCitation = {
       anchor: chunk.citationAnchor,
       sourceType: chunk.sourceType,

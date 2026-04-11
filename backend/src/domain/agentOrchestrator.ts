@@ -149,7 +149,7 @@ export async function runTeacherAgentChat(params: {
       data: insights.slice(0, 15),
     });
 
-    const hits = queryCorpus({
+    const hits = await queryCorpus({
       query: params.message,
       groupId: params.groupId,
       subjectId: group.subjectId,
@@ -241,7 +241,7 @@ export async function runStudentAgentChat(params: {
       },
     });
 
-    const hits = queryCorpus({
+    const hits = await queryCorpus({
       query: params.message,
       groupId: params.groupId,
       subjectId: group.subjectId,

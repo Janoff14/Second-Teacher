@@ -219,6 +219,13 @@ Teachers must be allowed to manage the `groupId`; students must be enrolled. Res
 
 ---
 
+## Related
+
+- **[Platform user workflow](platform-user-workflow.md)** — end-to-end journeys, endpoints, and intent (no UI prescription).
+- **[Frontend implementation plan](frontend-implementation-plan.md)** — golden-path demo order, workflows (**WF-CORPUS-*** mandatory), and phased tasks (J0–J5).
+
+---
+
 ## Keeping this doc fresh
 
 Routes are defined under `backend/src/routes/`. After adding or changing endpoints, update this file or generate an OpenAPI spec from the same source of truth.
