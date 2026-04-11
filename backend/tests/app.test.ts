@@ -475,7 +475,10 @@ describe("backend bootstrap and auth/rbac baseline", () => {
         subjectId,
         title: "Intro",
         versionLabel: "2026.1",
-        text: "Photosynthesis converts photonsgravitydummy into chemical energy.\n\nSecond paragraph for chunking.",
+        text:
+          "# Chapter 1: Light\n" +
+          "Photosynthesis converts photonsgravitydummy into chemical energy. Chlorophyll absorbs light.\n\n" +
+          "Plants also regulate gas exchange through stomata.",
       });
     expect(ingestRes.status).toBe(201);
     expect(ingestRes.body.data.chunksCreated).toBeGreaterThan(0);
@@ -530,8 +533,38 @@ describe("backend bootstrap and auth/rbac baseline", () => {
       .set("Authorization", `Bearer ${studentToken}`)
       .send({ query: "Photosynthesis photonsgravitydummy", groupId });
     expect(q1.status).toBe(200);
-    const hits1 = q1.body.data as Array<{ citation: { sourceType: string }; text: string }>;
+    const hits1 = q1.body.data as Array<{
+      citation: {
+        sourceType: string;
+        readerPath?: string;
+        textbookLocation?: {
+          paragraphId: string;
+          sentenceStart: number;
+          sentenceEnd: number;
+          chapterNumber: number;
+        };
+      };
+      text: string;
+    }>;
     expect(hits1.some((h) => h.citation.sourceType === "textbook")).toBe(true);
+    const textbookHit = hits1.find((h) => h.citation.sourceType === "textbook");
+    expect(textbookHit?.citation.readerPath).toMatch(/^\/reader\/textbooks\/tbs_/);
+    expect(textbookHit?.citation.textbookLocation?.chapterNumber).toBe(1);
+
+    const readerRes = await request(app)
+      .get("/reader/textbooks/tbs_1")
+      .query({
+        groupId,
+        paragraphId: textbookHit?.citation.textbookLocation?.paragraphId,
+        sentenceStart: textbookHit?.citation.textbookLocation?.sentenceStart,
+        sentenceEnd: textbookHit?.citation.textbookLocation?.sentenceEnd,
+      })
+      .set("Authorization", `Bearer ${studentToken}`);
+    expect(readerRes.status).toBe(200);
+    expect(readerRes.body.data.source.id).toBe("tbs_1");
+    expect((readerRes.body.data.chapters as unknown[]).length).toBeGreaterThan(0);
+    expect((readerRes.body.data.paragraphs as unknown[]).length).toBeGreaterThan(0);
+    expect(readerRes.body.data.focus).not.toBeNull();
 
     const q2 = await request(app)
       .post("/rag/query")
@@ -710,5 +743,85 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const exportRes = await request(app).get("/audit/logs/export").set("Authorization", `Bearer ${adminToken}`);
     expect(exportRes.status).toBe(200);
     expect(exportRes.headers["content-disposition"]).toMatch(/attachment/);
+  });
+
+  it("writes required academic audit actions and returns frontend-friendly log shape", async () => {
+    const app = createApp();
+    const adminLogin = await request(app)
+      .post("/auth/login")
+      .send({ email: "admin@secondteacher.dev", password: "ChangeMe123!" });
+    const adminToken = adminLogin.body.data.token as string;
+
+    const registerRes = await request(app).post("/auth/register").send({
+      email: "audit-register@secondteacher.dev",
+      password: "Welcome123!",
+      role: "student",
+      displayName: "Audit Student",
+    });
+    expect(registerRes.status).toBe(201);
+
+    const teacherRes = await request(app)
+      .post("/users/teachers")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        email: "audit-teacher@secondteacher.dev",
+        password: "Welcome123!",
+        displayName: "Audit Teacher",
+      });
+    expect(teacherRes.status).toBe(201);
+    const teacherId = teacherRes.body.data.user.id as string;
+
+    const subjectRes = await request(app)
+      .post("/subjects")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ name: "Audit Subject" });
+    expect(subjectRes.status).toBe(201);
+
+    const groupRes = await request(app)
+      .post("/groups")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ subjectId: subjectRes.body.data.id, name: "Audit Group" });
+    expect(groupRes.status).toBe(201);
+    const groupId = groupRes.body.data.id as string;
+
+    const assignRes = await request(app)
+      .post(`/groups/${groupId}/assign-teacher`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ teacherId });
+    expect(assignRes.status).toBe(201);
+
+    const logsRes = await request(app).get("/audit/logs?limit=200").set("Authorization", `Bearer ${adminToken}`);
+    expect(logsRes.status).toBe(200);
+    const rows = logsRes.body.data as Array<{
+      id: string;
+      actorId: string;
+      action: string;
+      groupId?: string;
+      targetId?: string;
+      detail: string;
+      meta: Record<string, unknown>;
+      createdAt: string;
+    }>;
+
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]).toMatchObject({
+      id: expect.any(String),
+      actorId: expect.any(String),
+      action: expect.any(String),
+      detail: expect.any(String),
+      meta: expect.any(Object),
+      createdAt: expect.any(String),
+    });
+
+    const actions = rows.map((r) => r.action);
+    expect(actions).toEqual(expect.arrayContaining(["register_user", "register_teacher", "create_subject", "create_group", "assign_teacher"]));
+
+    const exportRes = await request(app)
+      .get("/audit/logs/export?action=create_group&limit=5")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(exportRes.status).toBe(200);
+    const exported = JSON.parse(exportRes.text) as Array<{ action: string }>;
+    expect(exported.length).toBeGreaterThan(0);
+    expect(exported.every((row) => row.action === "create_group")).toBe(true);
   });
 });

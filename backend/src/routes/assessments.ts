@@ -14,6 +14,7 @@ import {
 } from "../domain/assessmentStore";
 import { refreshInsightsAfterAttempt } from "../domain/insightsStore";
 import { indexPublishedAssessmentVersion } from "../domain/ragStore";
+import { appendAuditLog } from "../domain/auditStore";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 
@@ -158,6 +159,16 @@ assessmentsRouter.post(
       if (group) {
         await indexPublishedAssessmentVersion(version, group.subjectId);
       }
+      appendAuditLog({
+        ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
+        actorId: user.userId,
+        actorRole: user.role,
+        action: "create_assessment",
+        groupId: version.groupId,
+        targetId: version.id,
+        detail: `${version.title} assessment published`,
+        meta: { draftId, itemCount: version.items.length },
+      });
       res.status(201).json({ data: version });
     } catch (e) {
       next(e);
@@ -274,6 +285,16 @@ assessmentsRouter.post(
       }
       const attempt = submitAttempt(versionId, user.userId, req.body.answers as Record<string, string>);
       refreshInsightsAfterAttempt(user.userId, version.groupId);
+      appendAuditLog({
+        ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
+        actorId: user.userId,
+        actorRole: user.role,
+        action: "submit_assessment",
+        groupId: version.groupId,
+        targetId: attempt.id,
+        detail: `Assessment attempt submitted`,
+        meta: { versionId, totalScore: attempt.totalScore, maxScore: attempt.maxScore },
+      });
       res.status(201).json({ data: attempt });
     } catch (e) {
       next(e);

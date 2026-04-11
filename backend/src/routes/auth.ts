@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { appendAuditLog } from "../domain/auditStore";
 import { createUser, getUserByEmail, verifyPassword } from "../domain/userStore";
 import { HttpError } from "../lib/httpError";
 import { signToken } from "../middleware/auth";
@@ -23,6 +24,15 @@ authRouter.post("/auth/register", validateBody(registerSchema), async (req, res,
       displayName?: string;
     };
     const user = await createUser(email, password, role, displayName ?? null);
+    appendAuditLog({
+      ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
+      actorId: user.id,
+      actorRole: user.role,
+      action: "register_user",
+      targetId: user.id,
+      detail: `User registration completed`,
+      meta: { role: user.role, email: user.email },
+    });
     const token = signToken(user.id, user.role);
     res.status(201).json({
       data: {

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { appendAuditLog } from "../domain/auditStore";
 import { createUser, listUsersByRole } from "../domain/userStore";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
@@ -29,6 +30,16 @@ usersRouter.post(
         displayName: string;
       };
       const user = await createUser(email, password, "teacher", displayName);
+      const actor = req.user!;
+      appendAuditLog({
+        ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
+        actorId: actor.userId,
+        actorRole: actor.role,
+        action: "register_teacher",
+        targetId: user.id,
+        detail: `Teacher ${user.displayName ?? user.email} registered`,
+        meta: { teacherEmail: user.email },
+      });
       res.status(201).json({
         data: {
           user: { id: user.id, email: user.email, role: user.role, displayName: user.displayName },

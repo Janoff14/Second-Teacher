@@ -22,11 +22,28 @@ auditRouter.get("/audit/logs", requireAuth, requireRole(["admin"]), (req, res) =
     filters.since = req.query.since;
   }
 
-  res.status(200).json({ data: listAuditLogs(filters) });
+  const rows = listAuditLogs(filters).map((row) => ({
+    id: row.id,
+    actorId: row.actorId,
+    action: row.action,
+    groupId: row.groupId,
+    targetId: row.targetId,
+    detail: row.detail,
+    meta: row.meta,
+    createdAt: row.createdAt,
+  }));
+
+  res.status(200).json({ data: rows });
 });
 
 auditRouter.get("/audit/logs/export", requireAuth, requireRole(["admin"]), (req, res) => {
+  const limitRaw = typeof req.query.limit === "string" ? Number.parseInt(req.query.limit, 10) : undefined;
+  const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw!, 1), 2000) : undefined;
+
   const filters: Parameters<typeof exportAuditLogsJson>[0] = {};
+  if (limit !== undefined) {
+    filters.limit = limit;
+  }
   if (typeof req.query.actorId === "string") {
     filters.actorId = req.query.actorId;
   }

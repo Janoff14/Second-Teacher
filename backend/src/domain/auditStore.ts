@@ -1,38 +1,48 @@
+import { randomUUID } from "node:crypto";
+
 export interface AuditLogRecord {
   id: string;
   createdAt: string;
+  actorId: string;
+  action: string;
+  groupId?: string;
+  targetId?: string;
+  detail: string;
+  meta: Record<string, unknown>;
+  requestId?: string;
+  actorRole?: string;
+}
+
+const records: AuditLogRecord[] = [];
+export function appendAuditLog(entry: {
   requestId?: string;
   actorId: string;
-  actorRole: string;
+  actorRole?: string;
   action: string;
-  scope: {
+  scope?: {
     groupId?: string;
     subjectId?: string;
     studentId?: string;
   };
-  metadata: Record<string, unknown>;
-}
-
-const records: AuditLogRecord[] = [];
-let counter = 1;
-
-export function appendAuditLog(entry: {
-  requestId?: string;
-  actorId: string;
-  actorRole: string;
-  action: string;
-  scope?: AuditLogRecord["scope"];
+  groupId?: string;
+  targetId?: string;
+  detail?: string;
   metadata?: Record<string, unknown>;
+  meta?: Record<string, unknown>;
 }): AuditLogRecord {
   const row: AuditLogRecord = {
-    id: `aud_${counter++}`,
+    id: randomUUID(),
     createdAt: new Date().toISOString(),
     actorId: entry.actorId,
-    actorRole: entry.actorRole,
     action: entry.action,
-    scope: entry.scope ?? {},
-    metadata: entry.metadata ?? {},
+    groupId: entry.groupId ?? entry.scope?.groupId,
+    targetId: entry.targetId,
+    detail: entry.detail ?? entry.action,
+    meta: entry.meta ?? entry.metadata ?? {},
   };
+  if (entry.actorRole !== undefined) {
+    row.actorRole = entry.actorRole;
+  }
   if (entry.requestId !== undefined) {
     row.requestId = entry.requestId;
   }
@@ -55,7 +65,7 @@ export function listAuditLogs(filters: {
     rows = rows.filter((r) => r.action === filters.action);
   }
   if (filters.groupId) {
-    rows = rows.filter((r) => r.scope.groupId === filters.groupId);
+    rows = rows.filter((r) => r.groupId === filters.groupId);
   }
   if (filters.since) {
     const t = Date.parse(filters.since);
@@ -74,5 +84,4 @@ export function exportAuditLogsJson(filters: Parameters<typeof listAuditLogs>[0]
 
 export function resetAuditStoreForTest(): void {
   records.length = 0;
-  counter = 1;
 }

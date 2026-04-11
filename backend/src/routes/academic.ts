@@ -9,6 +9,7 @@ import {
   listSubjects,
   revokeJoinCode,
 } from "../domain/academicStore";
+import { appendAuditLog } from "../domain/auditStore";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 
@@ -24,7 +25,17 @@ academicRouter.post(
   requireRole(["admin", "teacher"]),
   validateBody(createSubjectSchema),
   (req, res) => {
-    const subject = createSubject(req.body.name as string, req.user!.userId);
+    const actor = req.user!;
+    const subject = createSubject(req.body.name as string, actor.userId);
+    appendAuditLog({
+      ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
+      actorId: actor.userId,
+      actorRole: actor.role,
+      action: "create_subject",
+      targetId: subject.id,
+      detail: `${subject.name} subject created`,
+      meta: { subjectName: subject.name },
+    });
     res.status(201).json({ data: subject });
   },
 );
@@ -44,7 +55,18 @@ academicRouter.post(
   requireRole(["admin", "teacher"]),
   validateBody(createGroupSchema),
   (req, res) => {
-    const group = createGroup(req.body.subjectId as string, req.body.name as string, req.user!.userId);
+    const actor = req.user!;
+    const group = createGroup(req.body.subjectId as string, req.body.name as string, actor.userId);
+    appendAuditLog({
+      ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
+      actorId: actor.userId,
+      actorRole: actor.role,
+      action: "create_group",
+      groupId: group.id,
+      targetId: group.id,
+      detail: `${group.name} group created`,
+      meta: { subjectId: group.subjectId, groupName: group.name },
+    });
     res.status(201).json({ data: group });
   },
 );
@@ -67,7 +89,18 @@ academicRouter.post(
     if (!groupId || Array.isArray(groupId)) {
       throw new Error("Group id is required");
     }
-    const assignment = assignTeacher(groupId, req.body.teacherId as string, req.user!.userId);
+    const actor = req.user!;
+    const assignment = assignTeacher(groupId, req.body.teacherId as string, actor.userId);
+    appendAuditLog({
+      ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
+      actorId: actor.userId,
+      actorRole: actor.role,
+      action: "assign_teacher",
+      groupId,
+      targetId: assignment.teacherId,
+      detail: `Teacher assigned to group`,
+      meta: { assignedBy: assignment.assignedBy },
+    });
     res.status(201).json({ data: assignment });
   },
 );
@@ -86,7 +119,18 @@ academicRouter.post(
     if (!groupId || Array.isArray(groupId)) {
       throw new Error("Group id is required");
     }
-    const code = createJoinCode(groupId, req.user!.userId, req.body.ttlHours as number | undefined);
+    const actor = req.user!;
+    const code = createJoinCode(groupId, actor.userId, req.body.ttlHours as number | undefined);
+    appendAuditLog({
+      ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
+      actorId: actor.userId,
+      actorRole: actor.role,
+      action: "create_join_code",
+      groupId,
+      targetId: code.code,
+      detail: `Join code generated for group`,
+      meta: { expiresAt: code.expiresAt ?? null },
+    });
     res.status(201).json({
       data: {
         code: code.code,
