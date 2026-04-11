@@ -2,7 +2,7 @@
 # https://nixpacks.com/docs/configuration/file
 
 [variables]
-NIXPACKS_NODE_VERSION = "22"
+NIXPACKS_NODE_VERSION = "22.12.0"
 
 # Default `npm ci` in production omits devDependencies, but we need `typescript` + types to run `tsc`.
 [phases.install]
