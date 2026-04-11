@@ -288,6 +288,13 @@ export async function seedDefaultUsers(): Promise<void> {
     { email: "admin@secondteacher.dev", password: "ChangeMe123!", role: "admin", displayName: "Demo Admin" },
     { email: "z9k.admin@secondteacher.dev", password: "qwerty123", role: "admin", displayName: "Extra Admin" },
     { email: "teacher@secondteacher.dev", password: "ChangeMe123!", role: "teacher", displayName: "Demo Teacher" },
+    /** Roster demo owner; same password as seed students — sync with `DEMO_SEED_TEACHER_EMAIL` in `seed/demoDataset.ts`. */
+    {
+      email: "demo.seed.teacher@secondteacher.dev",
+      password: "DemoSeed2026!",
+      role: "teacher",
+      displayName: "Seed Demo Teacher",
+    },
     { email: "student@secondteacher.dev", password: "ChangeMe123!", role: "student", displayName: null },
   ];
 

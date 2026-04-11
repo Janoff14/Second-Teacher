@@ -6,18 +6,29 @@
  * - Remove `importDemoAttemptForSeeding` from `domain/assessmentStore.ts`
  * - Remove `SEED_DEMO_DATA` from `config/env.ts`
  * - Remove `runDemoDatasetSeedIfEnabled` call from `server.ts`
+ * - Remove `demo.seed.teacher@…` from `seedDefaultUsers` in `domain/userStore.ts`
  *
  * Enable: set env `SEED_DEMO_DATA=true` (or `1` / `yes`).
  *
  * Each run **resets in-memory** academic, assessment, insights, RAG, and audit stores (not user accounts),
  * then rebuilds the demo graph so restarts are repeatable. **Do not use on a server where teachers already
  * created real in-memory state** unless you accept wiping that on every boot.
+ *
+ * Closed loop: dedicated teacher → one subject → N sections (groups) with enrollments, join codes,
+ * mirrored published assessments per section, attempts only in each student’s section, insights per group,
+ * one shared textbook on the subject.
  */
 
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { resetAuditStoreForTest } from "../domain/auditStore";
-import { createEnrollment, createGroup, createSubject, resetAcademicStoreForTest } from "../domain/academicStore";
+import {
+  createEnrollment,
+  createGroup,
+  createJoinCode,
+  createSubject,
+  resetAcademicStoreForTest,
+} from "../domain/academicStore";
 import {
   createDraft,
   importDemoAttemptForSeeding,
@@ -34,10 +45,22 @@ import { createUser, getUserByEmail } from "../domain/userStore";
 import { resetRateLimitForTest } from "../middleware/rateLimit";
 
 export const DEMO_SEED_SUBJECT_NAME = "Demo Sandbox [SEED]";
-export const DEMO_SEED_GROUP_NAME = "Period A (SEED) — 120 students";
+/** Login for the roster demo; also seeded in `seedDefaultUsers` when present. */
+export const DEMO_SEED_TEACHER_EMAIL = "demo.seed.teacher@secondteacher.dev";
+export const DEMO_SEED_TEACHER_DISPLAY_NAME = "Seed Demo Teacher";
 export const DEMO_STUDENT_PASSWORD = "DemoSeed2026!";
 /** Total synthetic students (emails `demo.seed.s001@…` … `s120@…`) when using default seed options. */
 export const DEMO_STUDENT_COUNT = 120;
+
+/** Section (group) names; students are split evenly across these under {@link DEMO_SEED_TEACHER_EMAIL}. */
+export const DEMO_SEED_SECTION_NAMES = [
+  "Period A (SEED)",
+  "Period B (SEED)",
+  "Period C (SEED)",
+  "Period D (SEED)",
+] as const;
+
+export const DEMO_SEED_SECTION_COUNT = DEMO_SEED_SECTION_NAMES.length;
 
 export type DemoAssessmentKind = "practice" | "quiz" | "exam";
 
@@ -90,11 +113,20 @@ export const DEMO_ASSESSMENT_SPECS: DemoAssessmentSpec[] = buildDemoAssessmentSp
 
 export interface DemoSeedSummary {
   subjectId: string;
+  teacherId: string;
+  teacherEmail: string;
+  groupIds: string[];
+  /** Roster count per section, same order as {@link DEMO_SEED_SECTION_NAMES}. */
+  studentsPerSection: number[];
+  /** First section’s group id (compat for single-group callers). */
   groupId: string;
   studentCount: number;
-  versionCount: number;
+  /** Distinct published versions per section (mirrored across sections). */
+  versionsPerSection: number;
+  totalPublishedVersions: number;
   publishedVersionIds: string[];
   attemptCount: number;
+  /** Counts of published assessments by kind, summed across all sections. */
   byKind: Record<DemoAssessmentKind, number>;
 }
 
@@ -132,6 +164,16 @@ function studentEmail(index1Based: number): string {
 
 function profileForIndex(studentIndex: number): DemoProfile {
   return PROFILE_CYCLE[studentIndex % PROFILE_CYCLE.length]!;
+}
+
+/** Split `total` students across `sectionCount` sections as evenly as possible. */
+export function partitionStudentsAcrossSections(total: number, sectionCount: number): number[] {
+  if (sectionCount <= 0) {
+    return [];
+  }
+  const base = Math.floor(total / sectionCount);
+  const rem = total % sectionCount;
+  return Array.from({ length: sectionCount }, (_, i) => base + (i < rem ? 1 : 0));
 }
 
 function mulberry32(seed: number): () => number {
@@ -247,6 +289,14 @@ function standardItems(count: number, stemPrefix: string): Array<{
   }));
 }
 
+async function ensureDemoTeacher(): Promise<{ id: string }> {
+  const existing = await getUserByEmail(DEMO_SEED_TEACHER_EMAIL);
+  if (existing) {
+    return existing;
+  }
+  return createUser(DEMO_SEED_TEACHER_EMAIL, DEMO_STUDENT_PASSWORD, "teacher", DEMO_SEED_TEACHER_DISPLAY_NAME);
+}
+
 async function ensureStudent(email: string, displayName: string): Promise<string> {
   const existing = await getUserByEmail(email);
   if (existing) {
@@ -282,7 +332,7 @@ export type SeedDemoDatasetOptions = {
 
 /**
  * Resets in-memory academic, assessment, insights, RAG, audit, and rate-limit state (not users), then builds
- * the demo subject/group, assessments, enrollments, attempts, and textbook stub.
+ * the demo subject, sections (groups), enrollments, join codes, per-section assessments, attempts, and textbook.
  */
 export async function seedDemoDataset(options?: SeedDemoDatasetOptions): Promise<DemoSeedSummary> {
   resetAcademicStoreForTest();
@@ -292,52 +342,83 @@ export async function seedDemoDataset(options?: SeedDemoDatasetOptions): Promise
   resetAuditStoreForTest();
   resetRateLimitForTest();
 
-  const teacher = await getUserByEmail("teacher@secondteacher.dev");
-  if (!teacher) {
-    logger.warn("demo_seed_aborted_no_teacher_seed_user");
-    throw new Error("demo_seed_aborted_no_teacher_seed_user");
-  }
+  const teacher = await ensureDemoTeacher();
 
   const studentCount = options?.studentCount ?? DEMO_STUDENT_COUNT;
-  logger.info({ students: studentCount, versions: DEMO_ASSESSMENT_SPECS.length }, "demo_seed_start");
+  const studentsPerSection = partitionStudentsAcrossSections(studentCount, DEMO_SEED_SECTION_COUNT);
+
+  logger.info(
+    {
+      students: studentCount,
+      sections: DEMO_SEED_SECTION_COUNT,
+      studentsPerSection,
+      versionsPerSection: DEMO_ASSESSMENT_SPECS.length,
+      teacher: DEMO_SEED_TEACHER_EMAIL,
+    },
+    "demo_seed_start",
+  );
 
   const subject = createSubject(DEMO_SEED_SUBJECT_NAME, teacher.id);
-  const group = createGroup(subject.id, DEMO_SEED_GROUP_NAME, teacher.id);
-
   const studentIds = await ensureAllStudents(studentCount);
-  for (const id of studentIds) {
-    createEnrollment(group.id, id);
-  }
 
+  const groupIds: string[] = [];
+  const versionsBySection: AssessmentVersion[][] = [];
   const opens = new Date(Date.now() - 120 * 86_400_000).toISOString();
   const closes = new Date(Date.now() + 120 * 86_400_000).toISOString();
-
-  const versions: AssessmentVersion[] = [];
   const byKind: Record<DemoAssessmentKind, number> = { practice: 0, quiz: 0, exam: 0 };
 
-  for (const spec of DEMO_ASSESSMENT_SPECS) {
-    const draft = createDraft(group.id, spec.title, teacher.id);
-    setDraftItems(draft.id, standardItems(spec.itemCount, spec.stemPrefix));
-    const version = publishDraft(draft.id, teacher.id, {
-      windowOpensAtUtc: opens,
-      windowClosesAtUtc: closes,
-      windowTimezone: "UTC",
-    });
-    await indexPublishedAssessmentVersion(version, subject.id);
-    versions.push(version);
-    byKind[spec.kind] += 1;
+  let enrollOffset = 0;
+  for (let si = 0; si < DEMO_SEED_SECTION_COUNT; si++) {
+    const sectionName = DEMO_SEED_SECTION_NAMES[si]!;
+    const group = createGroup(subject.id, sectionName, teacher.id);
+    groupIds.push(group.id);
+    createJoinCode(group.id, teacher.id);
+
+    const sliceCount = studentsPerSection[si] ?? 0;
+    for (let k = 0; k < sliceCount; k++) {
+      createEnrollment(group.id, studentIds[enrollOffset + k]!);
+    }
+    enrollOffset += sliceCount;
+
+    const sectionVersions: AssessmentVersion[] = [];
+    for (const spec of DEMO_ASSESSMENT_SPECS) {
+      const draft = createDraft(group.id, spec.title, teacher.id);
+      setDraftItems(draft.id, standardItems(spec.itemCount, spec.stemPrefix));
+      const version = publishDraft(draft.id, teacher.id, {
+        windowOpensAtUtc: opens,
+        windowClosesAtUtc: closes,
+        windowTimezone: "UTC",
+      });
+      await indexPublishedAssessmentVersion(version, subject.id);
+      sectionVersions.push(version);
+      byKind[spec.kind] += 1;
+    }
+    versionsBySection.push(sectionVersions);
+  }
+
+  const sectionIndexByStudent: number[] = [];
+  {
+    let c = 0;
+    for (let si = 0; si < DEMO_SEED_SECTION_COUNT; si++) {
+      const n = studentsPerSection[si] ?? 0;
+      for (let k = 0; k < n; k++) {
+        sectionIndexByStudent[c++] = si;
+      }
+    }
   }
 
   let attemptCount = 0;
-  for (let si = 0; si < studentIds.length; si++) {
-    const studentId = studentIds[si]!;
-    const profile = profileForIndex(si);
-    const rng = mulberry32(10_000 + si * 7919);
+  for (let stu = 0; stu < studentIds.length; stu++) {
+    const studentId = studentIds[stu]!;
+    const sec = sectionIndexByStudent[stu] ?? 0;
+    const versions = versionsBySection[sec]!;
+    const profile = profileForIndex(stu);
+    const rng = mulberry32(10_000 + stu * 7919);
 
     for (let vi = 0; vi < versions.length; vi++) {
       const version = versions[vi]!;
       const kind = DEMO_ASSESSMENT_SPECS[vi]!.kind;
-      const dayOffsets = demoAttemptDaysAgoForProfile(profile, vi, si, kind);
+      const dayOffsets = demoAttemptDaysAgoForProfile(profile, vi, stu, kind);
       for (let ai = 0; ai < dayOffsets.length; ai++) {
         const day = dayOffsets[ai]!;
         const rate = correctRateFor(profile, ai, vi) * (0.9 + rng() * 0.18);
@@ -353,7 +434,9 @@ export async function seedDemoDataset(options?: SeedDemoDatasetOptions): Promise
     }
   }
 
-  recomputeGroupInsightsForAllStudents(group.id);
+  for (const gid of groupIds) {
+    recomputeGroupInsightsForAllStudents(gid);
+  }
 
   try {
     await ingestTextbook({
@@ -371,16 +454,21 @@ export async function seedDemoDataset(options?: SeedDemoDatasetOptions): Promise
     logger.warn({ err }, "demo_seed_textbook_ingest_failed_non_fatal");
   }
 
-  const publishedVersionIds = versions.map((v) => v.id);
+  const versionsPerSection = DEMO_ASSESSMENT_SPECS.length;
+  const publishedVersionIds = versionsBySection.flatMap((vs) => vs.map((v) => v.id));
+  const firstGroupId = groupIds[0]!;
 
   logger.info(
     {
       subjectId: subject.id,
-      groupId: group.id,
+      groupIds,
       students: studentIds.length,
+      studentsPerSection,
       attempts: attemptCount,
-      versions: versions.length,
+      versionsPerSection,
+      totalPublishedVersions: publishedVersionIds.length,
       byKind,
+      teacher: DEMO_SEED_TEACHER_EMAIL,
       password: DEMO_STUDENT_PASSWORD,
       emailPattern: `demo.seed.s001@secondteacher.dev … demo.seed.s${String(studentCount).padStart(3, "0")}@secondteacher.dev`,
       profilesInCycle: PROFILE_CYCLE,
@@ -390,9 +478,14 @@ export async function seedDemoDataset(options?: SeedDemoDatasetOptions): Promise
 
   return {
     subjectId: subject.id,
-    groupId: group.id,
+    teacherId: teacher.id,
+    teacherEmail: DEMO_SEED_TEACHER_EMAIL,
+    groupIds,
+    studentsPerSection,
+    groupId: firstGroupId,
     studentCount: studentIds.length,
-    versionCount: versions.length,
+    versionsPerSection,
+    totalPublishedVersions: publishedVersionIds.length,
     publishedVersionIds,
     attemptCount,
     byKind,
@@ -410,12 +503,21 @@ export async function runDemoDatasetSeedIfEnabled(): Promise<void> {
   }
 }
 
-/** Test helper: total attempts recorded for all published versions in a demo group. */
+/** Test helper: total attempts for all published versions in one group. */
 export function totalDemoAttemptsInGroup(groupId: string): number {
   const ids = listPublishedVersionsForGroup(groupId).map((v) => v.id);
   let n = 0;
   for (const id of ids) {
     n += listAttemptsForVersion(id).length;
+  }
+  return n;
+}
+
+/** Sum attempts across many groups (e.g. all demo sections). */
+export function totalDemoAttemptsInGroups(groupIds: string[]): number {
+  let n = 0;
+  for (const gid of groupIds) {
+    n += totalDemoAttemptsInGroup(gid);
   }
   return n;
 }

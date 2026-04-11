@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { resetAcademicStoreForTest } from "../src/domain/academicStore";
+import { listEnrollmentsForGroup, resetAcademicStoreForTest } from "../src/domain/academicStore";
 import { listAttemptsForVersion, resetAssessmentStoreForTest } from "../src/domain/assessmentStore";
 import { resetInsightsStoreForTest } from "../src/domain/insightsStore";
 import { resetRagStoreForTest } from "../src/domain/ragStore";
@@ -8,11 +8,13 @@ import { resetRateLimitForTest } from "../src/middleware/rateLimit";
 import { resetUsersForTest, seedDefaultUsers } from "../src/domain/userStore";
 import {
   DEMO_ASSESSMENT_SPECS,
+  DEMO_SEED_SECTION_COUNT,
   DEMO_STUDENT_COUNT,
   buildDemoAssessmentSpecs,
   demoAttemptDaysAgoForProfile,
+  partitionStudentsAcrossSections,
   seedDemoDataset,
-  totalDemoAttemptsInGroup,
+  totalDemoAttemptsInGroups,
 } from "../src/seed/demoDataset";
 
 describe("demo assessment specs", () => {
@@ -23,6 +25,16 @@ describe("demo assessment specs", () => {
     expect(specs.filter((s) => s.kind === "exam")).toHaveLength(3);
     expect(specs.length).toBe(13);
     expect(DEMO_ASSESSMENT_SPECS.length).toBe(13);
+  });
+});
+
+describe("partitionStudentsAcrossSections", () => {
+  it("splits 120 into four balanced sections", () => {
+    expect(partitionStudentsAcrossSections(120, 4)).toEqual([30, 30, 30, 30]);
+  });
+  it("distributes remainder across early sections", () => {
+    expect(partitionStudentsAcrossSections(8, 4)).toEqual([2, 2, 2, 2]);
+    expect(partitionStudentsAcrossSections(10, 4)).toEqual([3, 3, 2, 2]);
   });
 });
 
@@ -58,24 +70,39 @@ describe("seedDemoDataset", () => {
     await seedDefaultUsers();
   });
 
-  it("seeds reduced cohort quickly", async () => {
+  it("seeds reduced cohort quickly with four sections and a dedicated teacher", async () => {
     const s = await seedDemoDataset({ studentCount: 8 });
+    expect(s.teacherEmail).toBe("demo.seed.teacher@secondteacher.dev");
+    expect(s.groupIds.length).toBe(DEMO_SEED_SECTION_COUNT);
+    expect(s.studentsPerSection.reduce((a, b) => a + b, 0)).toBe(8);
     expect(s.studentCount).toBe(8);
-    expect(s.versionCount).toBe(13);
-    expect(s.byKind).toEqual({ practice: 5, quiz: 5, exam: 3 });
+    expect(s.versionsPerSection).toBe(13);
+    expect(s.totalPublishedVersions).toBe(13 * DEMO_SEED_SECTION_COUNT);
+    expect(s.byKind).toEqual({
+      practice: 5 * DEMO_SEED_SECTION_COUNT,
+      quiz: 5 * DEMO_SEED_SECTION_COUNT,
+      exam: 3 * DEMO_SEED_SECTION_COUNT,
+    });
     expect(s.attemptCount).toBeGreaterThan(80);
-    expect(totalDemoAttemptsInGroup(s.groupId)).toBe(s.attemptCount);
+    expect(totalDemoAttemptsInGroups(s.groupIds)).toBe(s.attemptCount);
+    for (let i = 0; i < s.groupIds.length; i++) {
+      expect(listEnrollmentsForGroup(s.groupIds[i]!).length).toBe(s.studentsPerSection[i]);
+    }
+    const practiceVid = s.publishedVersionIds[0]!;
+    expect(listAttemptsForVersion(practiceVid).length).toBeGreaterThanOrEqual(4);
   }, 60_000);
 
-  it(`seeds ${DEMO_STUDENT_COUNT} students, 13 published versions, and mass attempts`, async () => {
+  it(`seeds ${DEMO_STUDENT_COUNT} students across sections with mirrored assessments`, async () => {
     const s = await seedDemoDataset();
     expect(s.studentCount).toBe(DEMO_STUDENT_COUNT);
-    expect(s.versionCount).toBe(13);
-    expect(s.byKind.practice).toBe(5);
-    expect(s.byKind.quiz).toBe(5);
-    expect(s.byKind.exam).toBe(3);
+    expect(s.groupIds.length).toBe(DEMO_SEED_SECTION_COUNT);
+    expect(s.versionsPerSection).toBe(13);
+    expect(s.totalPublishedVersions).toBe(13 * DEMO_SEED_SECTION_COUNT);
+    expect(s.byKind.practice).toBe(5 * DEMO_SEED_SECTION_COUNT);
+    expect(s.byKind.quiz).toBe(5 * DEMO_SEED_SECTION_COUNT);
+    expect(s.byKind.exam).toBe(3 * DEMO_SEED_SECTION_COUNT);
     expect(s.attemptCount).toBeGreaterThan(3500);
-    expect(totalDemoAttemptsInGroup(s.groupId)).toBe(s.attemptCount);
+    expect(totalDemoAttemptsInGroups(s.groupIds)).toBe(s.attemptCount);
     const practiceVid = s.publishedVersionIds[0]!;
     expect(listAttemptsForVersion(practiceVid).length).toBeGreaterThanOrEqual(100);
   }, 180_000);
