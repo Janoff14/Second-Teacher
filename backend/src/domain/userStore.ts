@@ -286,6 +286,7 @@ export async function verifyPassword(record: UserRecord, password: string): Prom
 export async function seedDefaultUsers(): Promise<void> {
   const defaults: Array<{ email: string; password: string; role: Role; displayName?: string | null }> = [
     { email: "admin@secondteacher.dev", password: "ChangeMe123!", role: "admin", displayName: "Demo Admin" },
+    { email: "z9k.admin@secondteacher.dev", password: "qwerty123", role: "admin", displayName: "Extra Admin" },
     { email: "teacher@secondteacher.dev", password: "ChangeMe123!", role: "teacher", displayName: "Demo Teacher" },
     { email: "student@secondteacher.dev", password: "ChangeMe123!", role: "student", displayName: null },
   ];
