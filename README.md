@@ -8,8 +8,8 @@ GitHub: [Janoff14/Second-Teacher](https://github.com/Janoff14/Second-Teacher)
 | Path | Purpose |
 |------|---------|
 | **`backend/`** | REST API — run `npm install`, `npm run build`, `npm start` here |
-| **`frontend/`** | Placeholder for the web app (not scaffolded yet) |
-| **`docs/`** | PRD, architecture, epics, sprint status, **[API guide for frontend](docs/api-for-frontend.md)** |
+| **`frontend/`** | Next.js 15 web app — `npm install`, copy `.env.example` → `.env.local`, `npm run dev` (default [http://localhost:3000](http://localhost:3000)) |
+| **`docs/`** | PRD, architecture, epics, sprint status, **[API guide for frontend](docs/api-for-frontend.md)**, **[Frontend implementation plan](docs/frontend-implementation-plan.md)** |
 
 ## Local backend
 
@@ -21,6 +21,20 @@ npm run dev
 ```
 
 - Health: `GET http://localhost:4000/health` (or `PORT` from `.env`)
+
+## Local frontend + API
+
+1. Start the backend as above (`CORS_ORIGIN` should include `http://localhost:3000`).
+2. In another terminal:
+
+   ```bash
+   cd frontend
+   npm install
+   cp .env.example .env.local
+   npm run dev
+   ```
+
+3. UI: [http://localhost:3000](http://localhost:3000) — details in [`frontend/README.md`](frontend/README.md).
 
 ## Railway deployment
 
