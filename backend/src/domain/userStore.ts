@@ -9,9 +9,13 @@ export interface UserRecord {
   email: string;
   passwordHash: string;
   role: Role;
+  displayName: string | null;
 }
 
+export type UserPublic = Pick<UserRecord, "id" | "email" | "role" | "displayName">;
+
 const usersByEmail = new Map<string, UserRecord>();
+const usersById = new Map<string, UserRecord>();
 
 let idCounter = 1;
 
@@ -25,6 +29,25 @@ function db() {
   return getSupabaseServiceRoleClient();
 }
 
+function cacheUser(record: UserRecord): void {
+  usersByEmail.set(record.email, record);
+  usersById.set(record.id, record);
+}
+
+function resolveDisplayName(role: Role, displayName?: string | null): string | null {
+  const trimmed = displayName?.trim() ?? "";
+  if (role === "teacher") {
+    if (!trimmed) {
+      const err = new Error("Teacher display name is required") as Error & { statusCode?: number; code?: string };
+      err.statusCode = 400;
+      err.code = "TEACHER_NAME_REQUIRED";
+      throw err;
+    }
+    return trimmed;
+  }
+  return trimmed.length ? trimmed : null;
+}
+
 /**
  * Load all users from Supabase into the in-memory cache.
  * Called once at startup. Adjusts idCounter to avoid collisions.
@@ -35,7 +58,7 @@ export async function loadUsersFromDb(): Promise<number> {
 
   const { data, error } = await client
     .from("users")
-    .select("id, email, password_hash, role");
+    .select("id, email, password_hash, role, display_name");
 
   if (error) {
     logger.error({ err: error }, "supabase_load_users_failed");
@@ -49,8 +72,9 @@ export async function loadUsersFromDb(): Promise<number> {
       email: row.email,
       passwordHash: row.password_hash,
       role: row.role as Role,
+      displayName: row.display_name != null ? String(row.display_name) : null,
     };
-    usersByEmail.set(record.email, record);
+    cacheUser(record);
 
     const num = parseInt(record.id.replace("u_", ""), 10);
     if (!isNaN(num) && num >= idCounter) {
@@ -72,7 +96,7 @@ export async function getUserByEmail(email: string): Promise<UserRecord | undefi
 
   const { data, error } = await client
     .from("users")
-    .select("id, email, password_hash, role")
+    .select("id, email, password_hash, role, display_name")
     .eq("email", normalized)
     .maybeSingle();
 
@@ -83,13 +107,65 @@ export async function getUserByEmail(email: string): Promise<UserRecord | undefi
     email: data.email,
     passwordHash: data.password_hash,
     role: data.role as Role,
+    displayName: data.display_name != null ? String(data.display_name) : null,
   };
-  usersByEmail.set(normalized, record);
+  cacheUser(record);
   return record;
 }
 
-export async function createUser(email: string, password: string, role: Role): Promise<UserRecord> {
+export async function getUserById(id: string): Promise<UserRecord | undefined> {
+  const cached = usersById.get(id);
+  if (cached) return cached;
+
+  const client = db();
+  if (!client) return undefined;
+
+  const { data, error } = await client
+    .from("users")
+    .select("id, email, password_hash, role, display_name")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error || !data) return undefined;
+
+  const record: UserRecord = {
+    id: data.id,
+    email: data.email,
+    passwordHash: data.password_hash,
+    role: data.role as Role,
+    displayName: data.display_name != null ? String(data.display_name) : null,
+  };
+  cacheUser(record);
+  return record;
+}
+
+export async function listUsersByRole(role: Role): Promise<UserPublic[]> {
+  const client = db();
+  if (client) {
+    const { data, error } = await client.from("users").select("id, email, role, display_name").eq("role", role);
+    if (!error && data) {
+      return data.map((row) => ({
+        id: row.id,
+        email: row.email,
+        role: row.role as Role,
+        displayName: row.display_name != null ? String(row.display_name) : null,
+      }));
+    }
+  }
+
+  return [...usersByEmail.values()]
+    .filter((u) => u.role === role)
+    .map((u) => ({ id: u.id, email: u.email, role: u.role, displayName: u.displayName }));
+}
+
+export async function createUser(
+  email: string,
+  password: string,
+  role: Role,
+  displayName?: string | null,
+): Promise<UserRecord> {
   const normalized = email.toLowerCase();
+  const resolvedName = resolveDisplayName(role, displayName);
 
   if (usersByEmail.has(normalized)) {
     const err = new Error("Email already exists") as Error & { statusCode?: number; code?: string };
@@ -100,11 +176,7 @@ export async function createUser(email: string, password: string, role: Role): P
 
   const client = db();
   if (client) {
-    const { data: existing } = await client
-      .from("users")
-      .select("id")
-      .eq("email", normalized)
-      .maybeSingle();
+    const { data: existing } = await client.from("users").select("id").eq("email", normalized).maybeSingle();
     if (existing) {
       const err = new Error("Email already exists") as Error & { statusCode?: number; code?: string };
       err.statusCode = 409;
@@ -119,6 +191,7 @@ export async function createUser(email: string, password: string, role: Role): P
     email: normalized,
     passwordHash,
     role,
+    displayName: resolvedName,
   };
 
   if (client) {
@@ -127,6 +200,7 @@ export async function createUser(email: string, password: string, role: Role): P
       email: record.email,
       password_hash: record.passwordHash,
       role: record.role,
+      display_name: record.displayName,
     });
     if (error) {
       if (error.code === "23505") {
@@ -140,7 +214,7 @@ export async function createUser(email: string, password: string, role: Role): P
     }
   }
 
-  usersByEmail.set(normalized, record);
+  cacheUser(record);
   return record;
 }
 
@@ -149,21 +223,22 @@ export async function verifyPassword(record: UserRecord, password: string): Prom
 }
 
 export async function seedDefaultUsers(): Promise<void> {
-  const defaults: Array<{ email: string; password: string; role: Role }> = [
-    { email: "admin@secondteacher.dev", password: "ChangeMe123!", role: "admin" },
-    { email: "teacher@secondteacher.dev", password: "ChangeMe123!", role: "teacher" },
-    { email: "student@secondteacher.dev", password: "ChangeMe123!", role: "student" },
+  const defaults: Array<{ email: string; password: string; role: Role; displayName?: string | null }> = [
+    { email: "admin@secondteacher.dev", password: "ChangeMe123!", role: "admin", displayName: "Demo Admin" },
+    { email: "teacher@secondteacher.dev", password: "ChangeMe123!", role: "teacher", displayName: "Demo Teacher" },
+    { email: "student@secondteacher.dev", password: "ChangeMe123!", role: "student", displayName: null },
   ];
 
   for (const u of defaults) {
     const existing = await getUserByEmail(u.email);
     if (!existing) {
-      await createUser(u.email, u.password, u.role);
+      await createUser(u.email, u.password, u.role, u.displayName);
     }
   }
 }
 
 export function resetUsersForTest(): void {
   usersByEmail.clear();
+  usersById.clear();
   idCounter = 1;
 }

@@ -138,7 +138,9 @@ export function revokeJoinCode(groupId: string, code: string): JoinCodeRecord {
   return found;
 }
 
-export function resolveJoinCode(code: string): { group: GroupRecord; subject: SubjectRecord } | undefined {
+export function resolveJoinCode(
+  code: string,
+): { group: GroupRecord; subject: SubjectRecord; joinCode: JoinCodeRecord } | undefined {
   for (const [groupId, records] of joinCodes.entries()) {
     const active = records.find((item) => {
       if (item.code !== code) {
@@ -161,7 +163,7 @@ export function resolveJoinCode(code: string): { group: GroupRecord; subject: Su
       if (!subject) {
         return undefined;
       }
-      return { group, subject };
+      return { group, subject, joinCode: active };
     }
   }
   return undefined;

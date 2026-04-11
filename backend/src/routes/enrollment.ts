@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { createEnrollment, resolveJoinCode } from "../domain/academicStore";
-import { createUser } from "../domain/userStore";
+import { createUser, getUserById } from "../domain/userStore";
 import { signToken } from "../middleware/auth";
 import { rateLimit } from "../middleware/rateLimit";
 import { validateBody } from "../middleware/validate";
@@ -12,24 +12,37 @@ const joinCodePreviewSchema = z.object({
   code: z.string().min(6),
 });
 
-enrollmentRouter.post("/enrollment/preview", rateLimit(10, 60_000), validateBody(joinCodePreviewSchema), (req, res) => {
-  const resolved = resolveJoinCode(req.body.code as string);
-  if (!resolved) {
-    return res.status(404).json({
-      error: {
-        code: "INVALID_JOIN_CODE",
-        message: "Join code is invalid or expired",
-      },
-    });
-  }
+enrollmentRouter.post(
+  "/enrollment/preview",
+  rateLimit(10, 60_000),
+  validateBody(joinCodePreviewSchema),
+  async (req, res, next) => {
+    try {
+      const resolved = resolveJoinCode(req.body.code as string);
+      if (!resolved) {
+        return res.status(404).json({
+          error: {
+            code: "INVALID_JOIN_CODE",
+            message: "Join code is invalid or expired",
+          },
+        });
+      }
 
-  return res.status(200).json({
-    data: {
-      subjectName: resolved.subject.name,
-      groupName: resolved.group.name,
-    },
-  });
-});
+      const issuer = await getUserById(resolved.joinCode.createdBy);
+      const teacherDisplayName = issuer?.displayName?.trim() || null;
+
+      return res.status(200).json({
+        data: {
+          subjectName: resolved.subject.name,
+          groupName: resolved.group.name,
+          teacherDisplayName,
+        },
+      });
+    } catch (err) {
+      return next(err);
+    }
+  },
+);
 
 const signupWithCodeSchema = z.object({
   code: z.string().min(6),
@@ -59,7 +72,7 @@ enrollmentRouter.post(
 
       return res.status(201).json({
         data: {
-          user: { id: user.id, email: user.email, role: user.role },
+          user: { id: user.id, email: user.email, role: user.role, displayName: user.displayName },
           enrollment,
           token,
         },

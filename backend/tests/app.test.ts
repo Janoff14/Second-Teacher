@@ -60,6 +60,33 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     expect(protectedRes.body.data.user.role).toBe("teacher");
   });
 
+  it("lets admin create a teacher with display name and list teachers", async () => {
+    const app = createApp();
+    const adminLogin = await request(app)
+      .post("/auth/login")
+      .send({ email: "admin@secondteacher.dev", password: "ChangeMe123!" });
+    const adminToken = adminLogin.body.data.token as string;
+
+    const createRes = await request(app)
+      .post("/users/teachers")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({
+        email: "new-teacher@secondteacher.dev",
+        password: "Welcome123!",
+        displayName: "Jane Coach",
+      });
+    expect(createRes.status).toBe(201);
+    expect(createRes.body.data.user.displayName).toBe("Jane Coach");
+    expect(createRes.body.data.user.role).toBe("teacher");
+
+    const listRes = await request(app).get("/users/teachers").set("Authorization", `Bearer ${adminToken}`);
+    expect(listRes.status).toBe(200);
+    const rows = listRes.body.data as Array<{ email: string; displayName: string | null }>;
+    expect(rows.some((r) => r.email === "new-teacher@secondteacher.dev" && r.displayName === "Jane Coach")).toBe(
+      true,
+    );
+  });
+
   it("blocks user without required role", async () => {
     const app = createApp();
     const loginRes = await request(app)
@@ -106,6 +133,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const previewRes = await request(app).post("/enrollment/preview").send({ code });
     expect(previewRes.status).toBe(200);
     expect(previewRes.body.data.subjectName).toBe("Mathematics");
+    expect(previewRes.body.data.teacherDisplayName).toBe("Demo Teacher");
 
     const signupRes = await request(app)
       .post("/auth/signup-with-join-code")

@@ -17,6 +17,7 @@ import { enrollmentRouter } from "./routes/enrollment";
 import { healthRouter } from "./routes/health";
 import { protectedRouter } from "./routes/protected";
 import { ragRouter } from "./routes/rag";
+import { usersRouter } from "./routes/users";
 
 export function createApp() {
   const app = express();
@@ -42,6 +43,7 @@ export function createApp() {
 
   app.use(healthRouter);
   app.use(authRouter);
+  app.use(usersRouter);
   app.use(enrollmentRouter);
   app.use(academicRouter);
   app.use(analyticsRouter);
