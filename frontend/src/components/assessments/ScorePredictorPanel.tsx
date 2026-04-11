@@ -20,7 +20,7 @@ export function ScorePredictorPanel({
         {value}
         {range ? (
           <span className="ml-2 text-xs font-normal text-neutral-500">
-            (taxminiy oralig‘i: {range[0]}–{range[1]})
+            (est. range: {range[0]}–{range[1]})
           </span>
         ) : null}
       </span>
@@ -28,28 +28,20 @@ export function ScorePredictorPanel({
   );
 
   return (
-    <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
+    <div className="rounded-2xl border border-violet-200 bg-violet-50/50 p-5 dark:border-violet-900/50 dark:bg-violet-950/20">
       <h3 className="text-sm font-semibold text-violet-900 dark:text-violet-200">
-        Keyingi test imtihon — guruh bo‘yicha bashorat (demo)
+        Score prediction (demo)
       </h3>
       <p className="mt-1 text-xs text-neutral-600 dark:text-neutral-400">
-        Haqiqiy bashorat backend tayyor bo‘lganda almashtiriladi. Hozirgi raqamlar
-        savollar soniga bog‘liq mock.
+        Mock predictions based on question count and structure. Will be replaced
+        with real analytics when backend ML is ready.
       </p>
       <div className="mt-3">
-        {row(
-          "O‘rtacha ball",
-          prediction.average,
-          prediction.averageRange,
-        )}
+        {row("Average score", prediction.average, prediction.averageRange)}
         {row("Median", prediction.median, prediction.medianRange)}
-        {row("Eng past", prediction.min)}
-        {row("Eng yuqori", prediction.max)}
-        {row(
-          "O‘tish foizi (%)",
-          prediction.passPct,
-          prediction.passPctRange,
-        )}
+        {row("Lowest", prediction.min)}
+        {row("Highest", prediction.max)}
+        {row("Pass rate (%)", prediction.passPct, prediction.passPctRange)}
       </div>
     </div>
   );

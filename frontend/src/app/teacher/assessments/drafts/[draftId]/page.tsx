@@ -32,7 +32,6 @@ function ErrorBox({ message }: { message: string | null }) {
   );
 }
 
-/** datetime-local qiymatidan shu kunning oxirini (23:59) qo‘shadi */
 function sameLocalDayEnd(opensAtLocal: string): string {
   if (!opensAtLocal.includes("T")) return "";
   const [datePart] = opensAtLocal.split("T");
@@ -46,12 +45,13 @@ export default function EditDraftPage() {
 
   const [items, setItems] = useState<DraftItemInput[]>([newBlankItem()]);
   const [title, setTitle] = useState("");
+  const [draftGroupId, setDraftGroupId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [showPredictorAfterAction, setShowPredictorAfterAction] = useState(false);
+  const [showPredictor, setShowPredictor] = useState(false);
   const [simOpen, setSimOpen] = useState(false);
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -75,6 +75,10 @@ export default function EditDraftPage() {
     }
     const d = res.data;
     if (d?.title) setTitle(d.title);
+    if (d?.groupId) {
+      setDraftGroupId(d.groupId);
+      setPublishGroupId(d.groupId);
+    }
     setItems(itemsFromDraft(d?.items));
   }, [draftId]);
 
@@ -106,6 +110,10 @@ export default function EditDraftPage() {
     }
   }, [sameDayWindow, opensAt]);
 
+  const backHref = draftGroupId
+    ? `/teacher/groups/${encodeURIComponent(draftGroupId)}`
+    : "/teacher";
+
   async function handleSaveItems(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -117,14 +125,14 @@ export default function EditDraftPage() {
       setError(res.error.message);
       return;
     }
-    setSuccess("Savollar saqlandi.");
-    setShowPredictorAfterAction(true);
+    setSuccess("Questions saved successfully.");
+    setShowPredictor(true);
   }
 
   async function handlePublish(e: React.FormEvent) {
     e.preventDefault();
     if (!publishGroupId.trim()) {
-      setError("Nashr uchun guruhni tanlang yoki ID kiriting.");
+      setError("Select a class to publish to.");
       return;
     }
     setSaving(true);
@@ -140,12 +148,8 @@ export default function EditDraftPage() {
       setError(res.error.message);
       return;
     }
-    setSuccess("Nashr qilindi. Pastdagi bashorat (demo) ko‘rinadi — keyin ro‘yxatga o‘tasiz.");
-    setShowPredictorAfterAction(true);
-  }
-
-  function goToPublished() {
-    router.push("/teacher/assessments/published");
+    setSuccess("Assessment published! Students can now access it during the scheduled window.");
+    setShowPredictor(true);
   }
 
   async function handleSimulationSave(simItems: DraftItemInput[]) {
@@ -159,29 +163,38 @@ export default function EditDraftPage() {
     }
     setItems(simItems);
     setSimOpen(false);
-    setSuccess("Simulyatsiya versiyasi qoralama sifatida saqlandi.");
-    setShowPredictorAfterAction(true);
+    setSuccess("Simulation version saved as draft.");
+    setShowPredictor(true);
   }
 
   if (loading && !title && items.length === 1 && !items[0]?.stem) {
-    return (
-      <div className="text-sm text-neutral-500">Yuklanmoqda\u2026</div>
-    );
+    return <div className="text-sm text-neutral-500">Loading draft...</div>;
   }
 
   return (
-    <div className="space-y-10">
-      <div>
-        <Link
-          href="/teacher/assessments"
-          className="text-sm text-blue-600 hover:underline dark:text-blue-400"
-        >
-          &larr; Qoralamalar
+    <div className="space-y-8">
+      <div className="space-y-3">
+        <Link href={backHref} className="text-sm text-blue-600 hover:underline dark:text-blue-400">
+          &larr; Back to class
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
-          Qoralamani tahrirlash
-        </h1>
-        <p className="mt-1 font-mono text-xs text-neutral-500">{draftId}</p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
+              Edit assessment
+            </h1>
+            <p className="mt-1 font-mono text-xs text-neutral-500">{draftId}</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => setSimOpen(true)}
+              className="rounded-xl border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm font-medium text-violet-900 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200"
+            >
+              Simulate scores
+            </button>
+          </div>
+        </div>
       </div>
 
       <ErrorBox message={error} />
@@ -192,58 +205,49 @@ export default function EditDraftPage() {
       )}
 
       <form onSubmit={handleSaveItems} className="space-y-6">
-        <div>
-          <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            Sarlavha
-          </label>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="mt-1 w-full max-w-lg rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
-            disabled={saving}
-          />
-        </div>
-        <DraftItemsEditor
-          items={items}
-          onChange={setItems}
-          disabled={saving}
-        />
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
-          >
-            {saving ? "Saqlanmoqda\u2026" : "Savollarni saqlash"}
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => setSimOpen(true)}
-            className="rounded-md border border-violet-300 bg-violet-50 px-4 py-2 text-sm font-medium text-violet-900 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-200"
-          >
-            Simulyatsiya
-          </button>
+        <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
+                Title
+              </label>
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Quiz: Newton's Laws"
+                className="mt-1 w-full max-w-lg rounded-xl border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+                disabled={saving}
+              />
+            </div>
+            <DraftItemsEditor items={items} onChange={setItems} disabled={saving} />
+          </div>
+          <div className="mt-6 flex flex-wrap gap-2 border-t border-neutral-100 pt-4 dark:border-neutral-800">
+            <button
+              type="submit"
+              disabled={saving}
+              className="rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
+            >
+              {saving ? "Saving..." : "Save questions"}
+            </button>
+          </div>
         </div>
       </form>
 
-      {showPredictorAfterAction && (
-        <div className="space-y-3">
-          <ScorePredictorPanel prediction={prediction} />
-        </div>
+      {showPredictor && (
+        <ScorePredictorPanel prediction={prediction} />
       )}
 
-      <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+      <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
         <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
-          Nashr qilish
+          Publish to class
         </h2>
         <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-          Guruhni tanlang va (ixtiyoriy) ochilish/yopilish vaqtini belgilang.
+          Choose a class and set the availability window, then publish.
         </p>
         <form onSubmit={handlePublish} className="mt-4 space-y-4">
           <div>
             <label className="text-sm text-neutral-700 dark:text-neutral-300">
-              Fan va guruh
+              Subject and class
             </label>
             <div className="mt-1 flex flex-wrap gap-2">
               <select
@@ -252,9 +256,9 @@ export default function EditDraftPage() {
                   setSubjectId(e.target.value);
                   setPublishGroupId("");
                 }}
-                className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+                className="rounded-xl border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
               >
-                <option value="">Fan tanlang\u2026</option>
+                <option value="">Select subject...</option>
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -264,10 +268,10 @@ export default function EditDraftPage() {
               <select
                 value={publishGroupId}
                 onChange={(e) => setPublishGroupId(e.target.value)}
-                className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+                className="rounded-xl border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
                 disabled={!subjectId}
               >
-                <option value="">Guruh tanlang\u2026</option>
+                <option value="">Select class...</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}
@@ -275,12 +279,12 @@ export default function EditDraftPage() {
                 ))}
               </select>
             </div>
-            <p className="mt-2 text-xs text-neutral-500">Yoki guruh ID:</p>
+            <p className="mt-2 text-xs text-neutral-500">Or enter class ID directly:</p>
             <input
-              placeholder="groupId"
+              placeholder="Class ID"
               value={publishGroupId}
               onChange={(e) => setPublishGroupId(e.target.value)}
-              className="mt-1 w-full max-w-md rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm dark:border-neutral-600 dark:bg-neutral-950"
+              className="mt-1 w-full max-w-md rounded-xl border border-neutral-300 px-3 py-2 font-mono text-sm dark:border-neutral-600 dark:bg-neutral-950"
             />
           </div>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300">
@@ -290,30 +294,26 @@ export default function EditDraftPage() {
               onChange={(e) => setSameDayWindow(e.target.checked)}
               className="rounded border-neutral-300"
             />
-            Faqat tanlangan kunning oxirigacha ochiq (yopilish 23:59)
+            Close at end of selected day (23:59)
           </label>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="text-xs text-neutral-500">
-                Ochilish (mahalliy vaqt)
-              </label>
+              <label className="text-xs text-neutral-500">Opens (local time)</label>
               <input
                 type="datetime-local"
                 value={opensAt}
                 onChange={(e) => setOpensAt(e.target.value)}
-                className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+                className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
               />
             </div>
             <div>
-              <label className="text-xs text-neutral-500">
-                Yopilish (mahalliy vaqt)
-              </label>
+              <label className="text-xs text-neutral-500">Closes (local time)</label>
               <input
                 type="datetime-local"
                 value={closesAt}
                 onChange={(e) => setClosesAt(e.target.value)}
                 disabled={sameDayWindow}
-                className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm disabled:opacity-60 dark:border-neutral-600 dark:bg-neutral-950"
+                className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm disabled:opacity-60 dark:border-neutral-600 dark:bg-neutral-950"
               />
             </div>
           </div>
@@ -321,16 +321,9 @@ export default function EditDraftPage() {
             <button
               type="submit"
               disabled={saving}
-              className="rounded-md bg-blue-700 px-4 py-2 text-sm text-white dark:bg-blue-600"
+              className="rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-blue-600"
             >
-              {saving ? "Nashr\u2026" : "Guruhga nashr qilish"}
-            </button>
-            <button
-              type="button"
-              onClick={goToPublished}
-              className="rounded-md border border-neutral-300 px-4 py-2 text-sm dark:border-neutral-600"
-            >
-              Nashr etilganlar ro&apos;yxati
+              {saving ? "Publishing..." : "Publish to class"}
             </button>
           </div>
         </form>

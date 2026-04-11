@@ -29,7 +29,9 @@ function isActive(pathname: string, href: string): boolean {
   if (href === "/admin" || href === "/teacher" || href === "/student") {
     if (href === "/teacher") {
       return (
-        pathname === "/teacher" || pathname.startsWith("/teacher/groups")
+        pathname === "/teacher" ||
+        pathname.startsWith("/teacher/groups") ||
+        pathname.startsWith("/teacher/subjects")
       );
     }
     if (href === "/student") {
