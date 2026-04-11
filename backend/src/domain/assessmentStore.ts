@@ -254,6 +254,58 @@ export function submitAttempt(
   return attempt;
 }
 
+/**
+ * DEMO_SEED_ONLY — used only when `SEED_DEMO_DATA` loads `src/seed/demoDataset.ts`.
+ * Inserts a graded attempt with an arbitrary `submittedAt` (bypasses schedule window).
+ * Remove this function when removing the demo seed module.
+ */
+export function importDemoAttemptForSeeding(params: {
+  versionId: string;
+  studentId: string;
+  answers: Record<string, string>;
+  submittedAt: string;
+}): AttemptRecord {
+  const version = versionsById.get(params.versionId);
+  if (!version) {
+    throwHttp(404, "VERSION_NOT_FOUND", "Published assessment not found");
+  }
+
+  const itemResults: AttemptItemResult[] = version.items.map((item) => {
+    const selectedKey = params.answers[item.id];
+    if (!selectedKey) {
+      throwHttp(400, "MISSING_ANSWER", `Missing answer for item ${item.id}`);
+    }
+    if (!item.options[selectedKey]) {
+      throwHttp(400, "INVALID_ANSWER", `Invalid option for item ${item.id}`);
+    }
+    const correct = selectedKey === item.correctKey;
+    return {
+      itemId: item.id,
+      selectedKey,
+      correct,
+      points: correct ? 1 : 0,
+    };
+  });
+
+  const totalScore = itemResults.reduce((s, r) => s + r.points, 0);
+  const maxScore = version.items.length;
+
+  const attempt: AttemptRecord = {
+    id: `att_${attemptCounter++}`,
+    assessmentVersionId: params.versionId,
+    studentId: params.studentId,
+    submittedAt: params.submittedAt,
+    itemResults,
+    totalScore,
+    maxScore,
+  };
+
+  const list = attemptsByVersion.get(params.versionId) ?? [];
+  list.push(attempt);
+  attemptsByVersion.set(params.versionId, list);
+  return attempt;
+}
+
 export function listAttemptsForStudent(versionId: string, studentId: string): AttemptRecord[] {
   const list = attemptsByVersion.get(versionId) ?? [];
   return list.filter((a) => a.studentId === studentId);

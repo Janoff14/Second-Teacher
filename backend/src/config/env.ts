@@ -26,6 +26,14 @@ const envSchema = z.object({
    * Leave unset until you need admin storage/DB operations from this API.
    */
   SUPABASE_SERVICE_ROLE_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
+  /**
+   * When true, loads modular fake data from `src/seed/demoDataset.ts` at server startup.
+   * Never enable in production unless you intend a throwaway demo dataset.
+   */
+  SEED_DEMO_DATA: z.preprocess(
+    (v) => v === true || v === "true" || v === "1" || v === "yes" || v === "YES",
+    z.boolean().default(false),
+  ),
 });
 
 const parsed = envSchema.safeParse(process.env);
