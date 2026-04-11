@@ -9,6 +9,8 @@
  * - Remove `demo.seed.teacher@…` from `seedDefaultUsers` in `domain/userStore.ts`
  *
  * Enable: set env `SEED_DEMO_DATA=true` (or `1` / `yes`).
+ * Account list (email / password / name / section): `docs/demo-seed-accounts.md` (regenerate via
+ * `node backend/scripts/generate-demo-seed-accounts.mjs`).
  *
  * Each run **resets in-memory** academic, assessment, insights, RAG, and audit stores (not user accounts),
  * then rebuilds the demo graph so restarts are repeatable. **Do not use on a server where teachers already
