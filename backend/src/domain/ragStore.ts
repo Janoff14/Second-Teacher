@@ -15,6 +15,39 @@ export interface TextbookSourceRecord {
   createdAt: string;
 }
 
+export interface TextbookCitationLocation {
+  chapterNumber: number;
+  chapterTitle: string;
+  pageNumber: number;
+  paragraphId: string;
+  sentenceStart: number;
+  sentenceEnd: number;
+}
+
+interface TextbookParagraphRecord {
+  id: string;
+  chapterNumber: number;
+  chapterTitle: string;
+  paragraphIndexInChapter: number;
+  pageNumber: number;
+  text: string;
+  sentences: string[];
+}
+
+interface TextbookChapterRecord {
+  chapterNumber: number;
+  title: string;
+  startPage: number;
+  endPage: number;
+  paragraphIds: string[];
+}
+
+interface TextbookReaderDocument {
+  sourceId: string;
+  chapters: TextbookChapterRecord[];
+  paragraphs: TextbookParagraphRecord[];
+}
+
 export interface CorpusChunk {
   id: string;
   sourceType: ChunkSourceType;
@@ -28,11 +61,15 @@ export interface CorpusChunk {
   text: string;
   embedding: number[];
   citationAnchor: string;
+  textbookLocation?: TextbookCitationLocation;
+  readerPath?: string;
+  highlightText?: string;
   active: boolean;
 }
 
 const textbookSources: TextbookSourceRecord[] = [];
 const chunks: CorpusChunk[] = [];
+const textbookReaderDocuments = new Map<string, TextbookReaderDocument>();
 let textbookSourceCounter = 1;
 let chunkCounter = 1;
 
@@ -63,24 +100,173 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return s;
 }
 
-function splitTextIntoChunks(text: string, maxLen = 480): string[] {
+function isChapterHeading(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return false;
+  }
+  return /^#{1,6}\s+\S/.test(trimmed) || /^chapter\s+\d+([:\s-].*)?$/i.test(trimmed);
+}
+
+function cleanChapterHeading(line: string): string {
+  const trimmed = line.trim();
+  if (/^#{1,6}\s+\S/.test(trimmed)) {
+    return trimmed.replace(/^#{1,6}\s+/, "");
+  }
+  return trimmed;
+}
+
+function splitChapterBlocks(text: string): Array<{ title: string; body: string }> {
   const normalized = text.replace(/\r\n/g, "\n").trim();
   if (!normalized) {
     return [];
   }
-  const paragraphs = normalized.split(/\n\s*\n/);
-  const parts: string[] = [];
-  for (const p of paragraphs) {
-    const trimmed = p.trim();
-    if (trimmed.length <= maxLen) {
-      parts.push(trimmed);
+  const lines = normalized.split("\n");
+  const blocks: Array<{ title: string; body: string }> = [];
+  let currentTitle = "Chapter 1";
+  let currentLines: string[] = [];
+
+  for (const line of lines) {
+    if (isChapterHeading(line)) {
+      if (currentLines.join("\n").trim()) {
+        blocks.push({ title: currentTitle, body: currentLines.join("\n").trim() });
+      }
+      currentTitle = cleanChapterHeading(line);
+      currentLines = [];
       continue;
     }
-    for (let i = 0; i < trimmed.length; i += maxLen) {
-      parts.push(trimmed.slice(i, i + maxLen));
-    }
+    currentLines.push(line);
   }
-  return parts.filter(Boolean);
+
+  if (currentLines.join("\n").trim()) {
+    blocks.push({ title: currentTitle, body: currentLines.join("\n").trim() });
+  }
+
+  if (blocks.length === 0) {
+    return [{ title: "Chapter 1", body: normalized }];
+  }
+
+  return blocks.map((block, idx) => {
+    if (block.title === "Chapter 1" && idx > 0) {
+      return { ...block, title: `Chapter ${idx + 1}` };
+    }
+    return block;
+  });
+}
+
+function splitSentences(text: string): string[] {
+  const matches = text.match(/[^.!?]+[.!?]?/g) ?? [];
+  const sentences = matches.map((s) => s.trim()).filter(Boolean);
+  if (sentences.length === 0 && text.trim()) {
+    return [text.trim()];
+  }
+  return sentences;
+}
+
+function buildTextbookReaderDocument(sourceId: string, rawText: string): TextbookReaderDocument {
+  const chapterBlocks = splitChapterBlocks(rawText);
+  const paragraphs: TextbookParagraphRecord[] = [];
+  const chapters: TextbookChapterRecord[] = [];
+  const PAGE_CHAR_BUDGET = 1800;
+  let consumedChars = 0;
+
+  chapterBlocks.forEach((block, chapterIndex) => {
+    const chapterNumber = chapterIndex + 1;
+    const chapterParagraphIds: string[] = [];
+    const chapterParagraphs = block.body
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    const chapterStartPage = Math.floor(consumedChars / PAGE_CHAR_BUDGET) + 1;
+    chapterParagraphs.forEach((paragraphText, paragraphIndex) => {
+      const paragraphId = `tbp_${sourceId}_${chapterNumber}_${paragraphIndex + 1}`;
+      const pageNumber = Math.floor(consumedChars / PAGE_CHAR_BUDGET) + 1;
+      paragraphs.push({
+        id: paragraphId,
+        chapterNumber,
+        chapterTitle: block.title,
+        paragraphIndexInChapter: paragraphIndex + 1,
+        pageNumber,
+        text: paragraphText,
+        sentences: splitSentences(paragraphText),
+      });
+      chapterParagraphIds.push(paragraphId);
+      consumedChars += paragraphText.length + 2;
+    });
+    const chapterEndPage = Math.max(chapterStartPage, Math.floor(Math.max(consumedChars - 1, 0) / PAGE_CHAR_BUDGET) + 1);
+    chapters.push({
+      chapterNumber,
+      title: block.title,
+      startPage: chapterStartPage,
+      endPage: chapterEndPage,
+      paragraphIds: chapterParagraphIds,
+    });
+  });
+
+  return { sourceId, chapters, paragraphs };
+}
+
+function createTextbookChunks(
+  source: TextbookSourceRecord,
+  doc: TextbookReaderDocument,
+  maxLen = 480,
+): Array<{ text: string; citationAnchor: string; location: TextbookCitationLocation; readerPath: string }> {
+  const out: Array<{ text: string; citationAnchor: string; location: TextbookCitationLocation; readerPath: string }> = [];
+  let globalChunkIndex = 0;
+
+  for (const paragraph of doc.paragraphs) {
+    const sentences = paragraph.sentences.length > 0 ? paragraph.sentences : [paragraph.text];
+    let currentText = "";
+    let startSentence = 1;
+    let endSentence = 1;
+
+    const flush = () => {
+      if (!currentText.trim()) {
+        return;
+      }
+      const location: TextbookCitationLocation = {
+        chapterNumber: paragraph.chapterNumber,
+        chapterTitle: paragraph.chapterTitle,
+        pageNumber: paragraph.pageNumber,
+        paragraphId: paragraph.id,
+        sentenceStart: startSentence,
+        sentenceEnd: endSentence,
+      };
+      const citationAnchor =
+        `textbook:${source.id}:${source.versionLabel}` +
+        `#chapter:${location.chapterNumber}:paragraph:${location.paragraphId}:sentence:${location.sentenceStart}-${location.sentenceEnd}:chunk:${globalChunkIndex}`;
+      const readerPath =
+        `/reader/textbooks/${source.id}` +
+        `?paragraphId=${encodeURIComponent(location.paragraphId)}` +
+        `&sentenceStart=${location.sentenceStart}` +
+        `&sentenceEnd=${location.sentenceEnd}`;
+      out.push({
+        text: currentText.trim(),
+        citationAnchor,
+        location,
+        readerPath,
+      });
+      globalChunkIndex += 1;
+      currentText = "";
+    };
+
+    sentences.forEach((sentence, idx) => {
+      const sentenceNo = idx + 1;
+      const candidate = currentText ? `${currentText} ${sentence}` : sentence;
+      if (candidate.length > maxLen && currentText) {
+        flush();
+        currentText = sentence;
+        startSentence = sentenceNo;
+        endSentence = sentenceNo;
+      } else {
+        currentText = candidate;
+        endSentence = sentenceNo;
+      }
+    });
+    flush();
+  }
+
+  return out;
 }
 
 /**
@@ -140,7 +326,9 @@ async function ingestTextbookCore(params: {
   };
   textbookSources.push(source);
 
-  const pieces = splitTextIntoChunks(params.text);
+  const readerDoc = buildTextbookReaderDocument(source.id, params.text);
+  textbookReaderDocuments.set(source.id, readerDoc);
+  const pieces = createTextbookChunks(source, readerDoc);
   if (pieces.length === 0) {
     const err = new Error("No ingestible text after chunking") as Error & { statusCode?: number; code?: string };
     err.statusCode = 400;
@@ -152,12 +340,11 @@ async function ingestTextbookCore(params: {
     { sourceId: source.id, pieces: pieces.length, useOpenAI: hasOpenAI() },
     "rag_embedding_chunks",
   );
-  const embeddings = await embed(pieces);
+  const embeddings = await embed(pieces.map((p) => p.text));
 
   let created = 0;
   for (let i = 0; i < pieces.length; i++) {
-    const text = pieces[i]!;
-    const citationAnchor = `textbook:${source.id}:${params.versionLabel}#chunk:${i}`;
+    const piece = pieces[i]!;
     chunks.push({
       id: `chk_${chunkCounter++}`,
       sourceType: "textbook",
@@ -165,9 +352,12 @@ async function ingestTextbookCore(params: {
       subjectId: params.subjectId,
       visibility: "subject",
       chunkIndex: i,
-      text,
+      text: piece.text,
       embedding: embeddings[i]!,
-      citationAnchor,
+      citationAnchor: piece.citationAnchor,
+      textbookLocation: piece.location,
+      readerPath: piece.readerPath,
+      highlightText: piece.text,
       active: true,
     });
     created += 1;
@@ -235,6 +425,9 @@ export interface RetrievalCitation {
   groupId?: string;
   assessmentVersionId?: string;
   textbookSourceId?: string;
+  textbookLocation?: TextbookCitationLocation;
+  readerPath?: string;
+  highlightText?: string;
 }
 
 export interface RetrievalHit {
@@ -287,6 +480,15 @@ export async function queryCorpus(params: {
     if (chunk.textbookSourceId !== undefined) {
       citation.textbookSourceId = chunk.textbookSourceId;
     }
+    if (chunk.textbookLocation !== undefined) {
+      citation.textbookLocation = chunk.textbookLocation;
+    }
+    if (chunk.readerPath !== undefined) {
+      citation.readerPath = chunk.readerPath;
+    }
+    if (chunk.highlightText !== undefined) {
+      citation.highlightText = chunk.highlightText;
+    }
     scored.push({
       chunkId: chunk.id,
       text: chunk.text,
@@ -301,6 +503,15 @@ export async function queryCorpus(params: {
 export function resetRagStoreForTest(): void {
   textbookSources.length = 0;
   chunks.length = 0;
+  textbookReaderDocuments.clear();
   textbookSourceCounter = 1;
   chunkCounter = 1;
+}
+
+export function getTextbookSourceById(textbookSourceId: string): TextbookSourceRecord | undefined {
+  return textbookSources.find((s) => s.id === textbookSourceId);
+}
+
+export function getTextbookReaderDocument(textbookSourceId: string): TextbookReaderDocument | undefined {
+  return textbookReaderDocuments.get(textbookSourceId);
 }

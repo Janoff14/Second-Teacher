@@ -184,7 +184,9 @@ ragRouter.get("/reader/textbooks/:textbookSourceId", requireAuth, (req, res, nex
     const paragraphId = typeof req.query.paragraphId === "string" ? req.query.paragraphId : undefined;
     const sentenceStartRaw = typeof req.query.sentenceStart === "string" ? Number.parseInt(req.query.sentenceStart, 10) : undefined;
     const sentenceEndRaw = typeof req.query.sentenceEnd === "string" ? Number.parseInt(req.query.sentenceEnd, 10) : undefined;
-    const focusParagraph = paragraphId ? readerDoc.paragraphs.find((p) => p.id === paragraphId) : undefined;
+    const focusParagraph = paragraphId
+      ? readerDoc.paragraphs.find((p: { id: string }) => p.id === paragraphId)
+      : undefined;
     const sentenceStart = Number.isFinite(sentenceStartRaw) ? Math.max(1, sentenceStartRaw!) : undefined;
     const sentenceEnd = Number.isFinite(sentenceEndRaw) ? Math.max(sentenceStart ?? 1, sentenceEndRaw!) : undefined;
 

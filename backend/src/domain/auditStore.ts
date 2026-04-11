@@ -35,11 +35,16 @@ export function appendAuditLog(entry: {
     createdAt: new Date().toISOString(),
     actorId: entry.actorId,
     action: entry.action,
-    groupId: entry.groupId ?? entry.scope?.groupId,
-    targetId: entry.targetId,
     detail: entry.detail ?? entry.action,
     meta: entry.meta ?? entry.metadata ?? {},
   };
+  const groupId = entry.groupId ?? entry.scope?.groupId;
+  if (groupId !== undefined) {
+    row.groupId = groupId;
+  }
+  if (entry.targetId !== undefined) {
+    row.targetId = entry.targetId;
+  }
   if (entry.actorRole !== undefined) {
     row.actorRole = entry.actorRole;
   }

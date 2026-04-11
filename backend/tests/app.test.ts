@@ -824,4 +824,101 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     expect(exported.length).toBeGreaterThan(0);
     expect(exported.every((row) => row.action === "create_group")).toBe(true);
   });
+
+  it("covers remaining auth and protected endpoints", async () => {
+    const app = createApp();
+
+    const badLogin = await request(app)
+      .post("/auth/login")
+      .send({ email: "admin@secondteacher.dev", password: "WrongPassword!" });
+    expect(badLogin.status).toBe(401);
+    expect(badLogin.body.error.code).toBe("INVALID_CREDENTIALS");
+
+    const dupRegister = await request(app).post("/auth/register").send({
+      email: "student@secondteacher.dev",
+      password: "Welcome123!",
+      role: "student",
+    });
+    expect(dupRegister.status).toBe(409);
+    expect(dupRegister.body.error.code).toBe("USER_EXISTS");
+
+    const studentLogin = await request(app)
+      .post("/auth/login")
+      .send({ email: "student@secondteacher.dev", password: "ChangeMe123!" });
+    const studentToken = studentLogin.body.data.token as string;
+
+    const studentScope = await request(app)
+      .get("/protected/student")
+      .set("Authorization", `Bearer ${studentToken}`);
+    expect(studentScope.status).toBe(200);
+    expect(studentScope.body.data.user.role).toBe("student");
+
+    const adminLogin = await request(app)
+      .post("/auth/login")
+      .send({ email: "admin@secondteacher.dev", password: "ChangeMe123!" });
+    const adminToken = adminLogin.body.data.token as string;
+    const adminStudentScope = await request(app)
+      .get("/protected/student")
+      .set("Authorization", `Bearer ${adminToken}`);
+    expect(adminStudentScope.status).toBe(200);
+
+    const auditNoAuth = await request(app).get("/audit/logs");
+    expect(auditNoAuth.status).toBe(401);
+  });
+
+  it("covers list subjects/groups, join-code revoke, analytics recompute, and insights validation", async () => {
+    const app = createApp();
+    const teacherLogin = await request(app)
+      .post("/auth/login")
+      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+    const teacherToken = teacherLogin.body.data.token as string;
+
+    const subjectsEmpty = await request(app).get("/subjects").set("Authorization", `Bearer ${teacherToken}`);
+    expect(subjectsEmpty.status).toBe(200);
+    expect(subjectsEmpty.body.data).toEqual([]);
+
+    const groupsEmpty = await request(app).get("/groups").set("Authorization", `Bearer ${teacherToken}`);
+    expect(groupsEmpty.status).toBe(200);
+    expect(groupsEmpty.body.data).toEqual([]);
+
+    const subjectRes = await request(app)
+      .post("/subjects")
+      .set("Authorization", `Bearer ${teacherToken}`)
+      .send({ name: "Revoke analytics" });
+    const groupRes = await request(app)
+      .post("/groups")
+      .set("Authorization", `Bearer ${teacherToken}`)
+      .send({ subjectId: subjectRes.body.data.id, name: "Section" });
+    const groupId = groupRes.body.data.id as string;
+
+    const joinRes = await request(app)
+      .post(`/groups/${groupId}/join-codes`)
+      .set("Authorization", `Bearer ${teacherToken}`)
+      .send({});
+    const code = joinRes.body.data.code as string;
+
+    const previewBad = await request(app).post("/enrollment/preview").send({ code: "ZZZZZZ" });
+    expect(previewBad.status).toBe(404);
+    expect(previewBad.body.error.code).toBe("INVALID_JOIN_CODE");
+
+    const revokeRes = await request(app)
+      .post(`/groups/${groupId}/join-codes/revoke`)
+      .set("Authorization", `Bearer ${teacherToken}`)
+      .send({ code });
+    expect(revokeRes.status).toBe(200);
+    expect(revokeRes.body.data.code).toBe(code);
+
+    const previewAfter = await request(app).post("/enrollment/preview").send({ code });
+    expect(previewAfter.status).toBe(404);
+
+    const recompute = await request(app)
+      .post(`/groups/${groupId}/analytics/recompute`)
+      .set("Authorization", `Bearer ${teacherToken}`);
+    expect(recompute.status).toBe(202);
+    expect(recompute.body.data.ok).toBe(true);
+
+    const insightsNoGroup = await request(app).get("/insights").set("Authorization", `Bearer ${teacherToken}`);
+    expect(insightsNoGroup.status).toBe(400);
+    expect(insightsNoGroup.body.error.code).toBe("VALIDATION_ERROR");
+  });
 });

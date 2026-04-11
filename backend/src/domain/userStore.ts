@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { logger } from "../config/logger";
+import { HttpError } from "../lib/httpError";
 import { getSupabaseServiceRoleClient } from "../lib/supabase";
 
 export type Role = "admin" | "teacher" | "student";
@@ -18,6 +20,10 @@ const usersByEmail = new Map<string, UserRecord>();
 const usersById = new Map<string, UserRecord>();
 
 let idCounter = 1;
+const USER_SELECT = "id, email, password_hash, role, display_name";
+const USER_SELECT_NO_NAME = "id, email, password_hash, role";
+const USER_PUBLIC_SELECT = "id, email, role, display_name";
+const USER_PUBLIC_SELECT_NO_NAME = "id, email, role";
 
 function nextId(): string {
   const id = `u_${idCounter}`;
@@ -27,6 +33,13 @@ function nextId(): string {
 
 function db() {
   return getSupabaseServiceRoleClient();
+}
+
+function isMissingDisplayNameColumn(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = "code" in err ? String((err as { code?: unknown }).code ?? "") : "";
+  const message = "message" in err ? String((err as { message?: unknown }).message ?? "") : "";
+  return code === "42703" && message.includes("display_name");
 }
 
 function cacheUser(record: UserRecord): void {
@@ -56,9 +69,16 @@ export async function loadUsersFromDb(): Promise<number> {
   const client = db();
   if (!client) return 0;
 
-  const { data, error } = await client
-    .from("users")
-    .select("id, email, password_hash, role, display_name");
+  const primary = await client.from("users").select(USER_SELECT);
+  let data = primary.data;
+  let error = primary.error;
+
+  if (error && isMissingDisplayNameColumn(error)) {
+    logger.warn({ err: error }, "supabase_users_missing_display_name_column_fallback");
+    const fallback = await client.from("users").select(USER_SELECT_NO_NAME);
+    data = fallback.data ? fallback.data.map((row) => ({ ...row, display_name: null })) : null;
+    error = fallback.error;
+  }
 
   if (error) {
     logger.error({ err: error }, "supabase_load_users_failed");
@@ -94,11 +114,15 @@ export async function getUserByEmail(email: string): Promise<UserRecord | undefi
   const client = db();
   if (!client) return undefined;
 
-  const { data, error } = await client
-    .from("users")
-    .select("id, email, password_hash, role, display_name")
-    .eq("email", normalized)
-    .maybeSingle();
+  const primary = await client.from("users").select(USER_SELECT).eq("email", normalized).maybeSingle();
+  let data = primary.data;
+  let error = primary.error;
+
+  if (error && isMissingDisplayNameColumn(error)) {
+    const fallback = await client.from("users").select(USER_SELECT_NO_NAME).eq("email", normalized).maybeSingle();
+    data = fallback.data ? { ...fallback.data, display_name: null } : fallback.data;
+    error = fallback.error;
+  }
 
   if (error || !data) return undefined;
 
@@ -120,11 +144,15 @@ export async function getUserById(id: string): Promise<UserRecord | undefined> {
   const client = db();
   if (!client) return undefined;
 
-  const { data, error } = await client
-    .from("users")
-    .select("id, email, password_hash, role, display_name")
-    .eq("id", id)
-    .maybeSingle();
+  const primary = await client.from("users").select(USER_SELECT).eq("id", id).maybeSingle();
+  let data = primary.data;
+  let error = primary.error;
+
+  if (error && isMissingDisplayNameColumn(error)) {
+    const fallback = await client.from("users").select(USER_SELECT_NO_NAME).eq("id", id).maybeSingle();
+    data = fallback.data ? { ...fallback.data, display_name: null } : fallback.data;
+    error = fallback.error;
+  }
 
   if (error || !data) return undefined;
 
@@ -142,7 +170,16 @@ export async function getUserById(id: string): Promise<UserRecord | undefined> {
 export async function listUsersByRole(role: Role): Promise<UserPublic[]> {
   const client = db();
   if (client) {
-    const { data, error } = await client.from("users").select("id, email, role, display_name").eq("role", role);
+    const primary = await client.from("users").select(USER_PUBLIC_SELECT).eq("role", role);
+    let data = primary.data;
+    let error = primary.error;
+
+    if (error && isMissingDisplayNameColumn(error)) {
+      const fallback = await client.from("users").select(USER_PUBLIC_SELECT_NO_NAME).eq("role", role);
+      data = fallback.data ? fallback.data.map((row) => ({ ...row, display_name: null })) : null;
+      error = fallback.error;
+    }
+
     if (!error && data) {
       return data.map((row) => ({
         id: row.id,
@@ -186,8 +223,10 @@ export async function createUser(
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
+  /** Supabase `users.id` is almost always `uuid`; local-only mode uses `u_` counters. */
+  const id = client ? randomUUID() : nextId();
   const record: UserRecord = {
-    id: nextId(),
+    id,
     email: normalized,
     passwordHash,
     role,
@@ -195,13 +234,23 @@ export async function createUser(
   };
 
   if (client) {
-    const { error } = await client.from("users").insert({
+    let { error } = await client.from("users").insert({
       id: record.id,
       email: record.email,
       password_hash: record.passwordHash,
       role: record.role,
       display_name: record.displayName,
     });
+    if (error && isMissingDisplayNameColumn(error)) {
+      logger.warn({ err: error, email: normalized }, "supabase_users_missing_display_name_on_insert_fallback");
+      const fallback = await client.from("users").insert({
+        id: record.id,
+        email: record.email,
+        password_hash: record.passwordHash,
+        role: record.role,
+      });
+      error = fallback.error;
+    }
     if (error) {
       if (error.code === "23505") {
         const err = new Error("Email already exists") as Error & { statusCode?: number; code?: string };
@@ -209,8 +258,20 @@ export async function createUser(
         err.code = "USER_EXISTS";
         throw err;
       }
-      logger.error({ err: error, email: normalized }, "supabase_create_user_failed");
-      throw new Error("Failed to persist user");
+      logger.error(
+        {
+          err: error,
+          email: normalized,
+          pgCode: (error as { code?: string }).code,
+          pgMessage: (error as { message?: string }).message,
+        },
+        "supabase_create_user_failed",
+      );
+      throw new HttpError(
+        502,
+        "USER_PERSIST_FAILED",
+        "Could not save user to database; check server logs and Supabase schema (id type, columns, migrations).",
+      );
     }
   }
 
@@ -232,7 +293,16 @@ export async function seedDefaultUsers(): Promise<void> {
   for (const u of defaults) {
     const existing = await getUserByEmail(u.email);
     if (!existing) {
-      await createUser(u.email, u.password, u.role, u.displayName);
+      try {
+        await createUser(u.email, u.password, u.role, u.displayName);
+      } catch (err) {
+        const code = (err as { code?: string } | undefined)?.code;
+        if (code === "USER_EXISTS") {
+          logger.info({ email: u.email }, "seed_user_already_exists");
+          continue;
+        }
+        throw err;
+      }
     }
   }
 }

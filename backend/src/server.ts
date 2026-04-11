@@ -6,8 +6,10 @@ import { loadUsersFromDb, seedDefaultUsers } from "./domain/userStore";
 const LISTEN_HOST = process.env.HOST ?? "0.0.0.0";
 
 async function start() {
-  await loadUsersFromDb();
+  const loadedUsers = await loadUsersFromDb();
+  logger.info({ loadedUsers }, "startup_users_loaded");
   await seedDefaultUsers();
+  logger.info("startup_default_users_seeded");
   const app = createApp();
   app.listen(env.PORT, LISTEN_HOST, () => {
     logger.info(
