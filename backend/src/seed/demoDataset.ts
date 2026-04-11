@@ -18,7 +18,8 @@
  *
  * Closed loop: dedicated teacher → one subject → N sections (groups) with enrollments, join codes,
  * mirrored published assessments per section, attempts only in each student’s section, insights per group,
- * one shared textbook on the subject.
+ * one shared textbook on the subject. Also assigns `teacher@secondteacher.dev` to every demo group when that
+ * user exists so the default seeded teacher sees the same roster in the UI.
  */
 
 import { env } from "../config/env";

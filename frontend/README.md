@@ -27,6 +27,12 @@ Next.js 15 (App Router) + TypeScript + Tailwind. Roles: **admin**, **teacher**, 
 
 `NEXT_PUBLIC_API_BASE_URL` must match the API (default `http://localhost:4000`, no trailing slash).
 
+### “It worked on another computer” / login fails
+
+- **Wrong password:** `demo.seed.teacher@secondteacher.dev` uses **`DemoSeed2026!`**, not `ChangeMe123!` (see `docs/demo-seed-accounts.md`).
+- **Wrong API:** `.env.local` must point at the backend running **on this machine** (or the same deploy you expect). A URL left over from another PC may hit Railway/Supabase users that don’t match your local seeds.
+- **Supabase:** If the API has `SUPABASE_URL` + service role set, users are read/written in the cloud. A row for `demo.seed.teacher@…` created elsewhere can have a **different** password than `DemoSeed2026!`.
+
 ## Docs
 
 - [API for frontend](../docs/api-for-frontend.md)
