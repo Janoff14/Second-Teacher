@@ -41,6 +41,43 @@ export type AttemptRecord = {
   answers?: Record<string, string>;
 };
 
+export type TeacherAssessmentResultRow = {
+  attemptId: string;
+  studentId: string;
+  studentName?: string | null;
+  studentEmail?: string | null;
+  submittedAt: string;
+  totalScore: number;
+  maxScore: number;
+  scorePct: number;
+};
+
+export type TeacherAssessmentResultSummary = {
+  id: string;
+  title: string;
+  type: "practice" | "quiz" | "test" | "exam" | "assessment";
+  publishedAt: string;
+  windowOpensAtUtc: string;
+  windowClosesAtUtc: string;
+  windowTimezone: string;
+  itemCount: number;
+  enrolledCount: number;
+  attemptCount: number;
+  averageScorePct?: number | null;
+  highestScorePct?: number | null;
+  latestSubmittedAt?: string | null;
+  results: TeacherAssessmentResultRow[];
+};
+
+export type TeacherGroupResultsSummary = {
+  groupId: string;
+  enrolledCount: number;
+  assessmentCount: number;
+  totalAttemptCount: number;
+  overallAverageScorePct?: number | null;
+  assessments: TeacherAssessmentResultSummary[];
+};
+
 function asArray<T>(data: unknown): T[] {
   if (data == null) return [];
   if (Array.isArray(data)) return data as T[];
@@ -225,6 +262,12 @@ export async function listMyAttempts(groupId: string) {
     `/assessments/attempts/me?${q.toString()}`,
     { method: "GET" },
   );
+}
+
+export async function getTeacherGroupResultsSummary(groupId: string) {
+  return apiRequest<TeacherGroupResultsSummary>(`/groups/${groupId}/results-summary`, {
+    method: "GET",
+  });
 }
 
 /** Unwrap list from various envelope shapes. */

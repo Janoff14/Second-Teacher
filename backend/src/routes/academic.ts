@@ -15,7 +15,10 @@ import {
   revokeJoinCodeById,
 } from "../domain/academicStore";
 import { appendAuditLog } from "../domain/auditStore";
+import { listStudentAttemptsInGroup } from "../domain/assessmentStore";
+import { classifyRiskFromSnapshot, computeRiskFeatureSnapshot } from "../domain/insightsStore";
 import { buildStudentAcademicScope } from "../domain/studentExperience";
+import { getUserById } from "../domain/userStore";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 
@@ -134,23 +137,45 @@ academicRouter.get(
   "/groups/:groupId/students",
   requireAuth,
   requireRole(["admin", "teacher"]),
-  (req, res) => {
-    const groupId = req.params.groupId;
-    if (!groupId || Array.isArray(groupId)) {
-      throw new Error("Group id is required");
+  async (req, res, next) => {
+    try {
+      const groupId = req.params.groupId;
+      if (!groupId || Array.isArray(groupId)) {
+        throw new Error("Group id is required");
+      }
+      const actor = req.user!;
+      if (!canTeacherManageGroup(actor.userId, actor.role, groupId)) {
+        const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 403;
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+      const students = await Promise.all(
+        listEnrollmentsForGroup(groupId).map(async (e) => {
+          const user = await getUserById(e.studentId);
+          const attempts = listStudentAttemptsInGroup(e.studentId, groupId);
+          const latestAttempt = attempts.length > 0 ? attempts[attempts.length - 1]!.attempt : null;
+          const risk = classifyRiskFromSnapshot(computeRiskFeatureSnapshot(e.studentId, groupId));
+          return {
+            studentId: e.studentId,
+            displayName: user?.displayName ?? null,
+            email: user?.email ?? null,
+            enrolledAt: e.enrolledAt,
+            attemptCount: attempts.length,
+            lastAttemptAt: latestAttempt?.submittedAt ?? null,
+            latestScorePct:
+              latestAttempt && latestAttempt.maxScore > 0
+                ? Math.round((latestAttempt.totalScore / latestAttempt.maxScore) * 1000) / 10
+                : null,
+            riskLevel: risk.level,
+            riskReason: risk.reasons[0]?.message ?? null,
+          };
+        }),
+      );
+      res.status(200).json({ data: students });
+    } catch (e) {
+      next(e);
     }
-    const actor = req.user!;
-    if (!canTeacherManageGroup(actor.userId, actor.role, groupId)) {
-      const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
-      err.statusCode = 403;
-      err.code = "FORBIDDEN";
-      throw err;
-    }
-    const students = listEnrollmentsForGroup(groupId).map((e) => ({
-      studentId: e.studentId,
-      enrolledAt: e.enrolledAt,
-    }));
-    res.status(200).json({ data: students });
   },
 );
 

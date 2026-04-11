@@ -34,7 +34,6 @@ export default function TeacherDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [busyGroupId, setBusyGroupId] = useState<string | null>(null);
   const [lastCodes, setLastCodes] = useState<Record<string, string>>({});
-  /** Tanlangan fan — guruhlar alohida panelda ochiladi. */
   const [openSubjectId, setOpenSubjectId] = useState<string | null>(null);
   const groupsPanelRef = useRef<HTMLDivElement>(null);
 
@@ -47,14 +46,10 @@ export default function TeacherDashboardPage() {
     if (scopeRes.ok) {
       const raw = scopeRes.data;
       const blocks = unwrapTeacherAcademicScope(raw);
-      const useScope =
-        blocks.length > 0 || isExplicitEmptyTeacherScope(raw);
+      const useScope = blocks.length > 0 || isExplicitEmptyTeacherScope(raw);
       if (useScope) {
         const rows: SubjectWithGroups[] = blocks
-          .map((b) => ({
-            ...b.subject,
-            groups: b.groups,
-          }))
+          .map((block) => ({ ...block.subject, groups: block.groups }))
           .filter((row) => row.groups.length > 0);
         setTree(rows);
         setLoading(false);
@@ -62,22 +57,24 @@ export default function TeacherDashboardPage() {
       }
     }
 
-    const sRes = await listSubjects();
-    if (!sRes.ok) {
-      setError(sRes.error.message);
+    const subjectRes = await listSubjects();
+    if (!subjectRes.ok) {
+      setError(subjectRes.error.message);
       setTree([]);
       setLoading(false);
       return;
     }
-    const subjects = Array.isArray(sRes.data) ? sRes.data : [];
+
+    const subjects = Array.isArray(subjectRes.data) ? subjectRes.data : [];
     const rows: SubjectWithGroups[] = [];
-    for (const s of subjects) {
-      const gRes = await listGroups(s.id);
-      const raw = gRes.ok && Array.isArray(gRes.data) ? gRes.data : [];
-      const groups = filterGroupsForTeacher(raw, s.id, teacherId);
+    for (const subject of subjects) {
+      const groupsRes = await listGroups(subject.id);
+      const rawGroups = groupsRes.ok && Array.isArray(groupsRes.data) ? groupsRes.data : [];
+      const groups = filterGroupsForTeacher(rawGroups, subject.id, teacherId);
       if (groups.length === 0) continue;
-      rows.push({ ...s, groups });
+      rows.push({ ...subject, groups });
     }
+
     setTree(rows);
     setLoading(false);
   }, []);
@@ -87,25 +84,17 @@ export default function TeacherDashboardPage() {
   }, [load]);
 
   useEffect(() => {
-    if (
-      openSubjectId &&
-      !tree.some((s) => s.id === openSubjectId)
-    ) {
+    if (openSubjectId && !tree.some((subject) => subject.id === openSubjectId)) {
       setOpenSubjectId(null);
     }
-  }, [tree, openSubjectId]);
+  }, [openSubjectId, tree]);
 
   useEffect(() => {
     if (!openSubjectId || !groupsPanelRef.current) return;
-    groupsPanelRef.current.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-    });
+    groupsPanelRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [openSubjectId]);
 
-  const selectedSubject = openSubjectId
-    ? tree.find((s) => s.id === openSubjectId)
-    : undefined;
+  const selectedSubject = openSubjectId ? tree.find((subject) => subject.id === openSubjectId) : undefined;
 
   async function handleJoinCode(groupId: string) {
     setBusyGroupId(groupId);
@@ -116,17 +105,18 @@ export default function TeacherDashboardPage() {
       setError(res.error.message);
       return;
     }
+
     const code =
       res.data && typeof res.data === "object" && "code" in res.data
         ? String((res.data as JoinCodeRecord).code ?? "")
         : "";
-    if (code) {
-      setLastCodes((m) => ({ ...m, [groupId]: code }));
-      try {
-        await navigator.clipboard.writeText(code);
-      } catch {
-        /* ignore */
-      }
+    if (!code) return;
+
+    setLastCodes((current) => ({ ...current, [groupId]: code }));
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch {
+      // Ignore clipboard issues in demo mode.
     }
   }
 
@@ -135,10 +125,10 @@ export default function TeacherDashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
-            O{"'"}qituvchi paneli
+            Teacher dashboard
           </h1>
           <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-            Fan kartochkasini bosing — pastda shu fanga tegishli guruhlar ochiladi.
+            Select a subject card to reveal its classes below.
           </p>
         </div>
         <button
@@ -147,34 +137,32 @@ export default function TeacherDashboardPage() {
           disabled={loading}
           className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800"
         >
-          {loading ? "Yuklanmoqda\u2026" : "Yangilash"}
+          {loading ? "Loading..." : "Refresh"}
         </button>
       </div>
 
       <ErrorBox message={error} />
 
       {loading && tree.length === 0 ? (
-        <p className="text-sm text-neutral-500">Yuklanmoqda\u2026</p>
+        <p className="text-sm text-neutral-500">Loading...</p>
       ) : null}
 
-      {!loading && tree.every((s) => s.groups.length === 0) ? (
+      {!loading && tree.every((subject) => subject.groups.length === 0) ? (
         <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50/80 px-4 py-8 text-center text-sm text-neutral-600 dark:border-neutral-700 dark:bg-neutral-900/40 dark:text-neutral-400">
-          Hozircha guruh yo{"'"}q. Administrator sizni guruhga biriktirishi kerak
-          yoki{" "}
+          No classes are available yet. An administrator can assign you to a class, or you can use{" "}
           <Link
             href="/teacher/structure"
             className="font-medium text-blue-600 underline dark:text-blue-400"
           >
-            tuzilma
+            structure
           </Link>{" "}
-          sahifasida fan/guruh yarating.
+          to create a subject and class.
         </div>
       ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {tree.map((subject) => {
           const isOpen = openSubjectId === subject.id;
-          const n = subject.groups.length;
           return (
             <section
               key={subject.id}
@@ -187,12 +175,8 @@ export default function TeacherDashboardPage() {
               <button
                 type="button"
                 aria-expanded={isOpen}
-                aria-label={`${subject.name} — guruhlarni ochish yoki yopish`}
-                onClick={() =>
-                  setOpenSubjectId((prev) =>
-                    prev === subject.id ? null : subject.id,
-                  )
-                }
+                aria-label={`${subject.name} - open or close classes`}
+                onClick={() => setOpenSubjectId((current) => (current === subject.id ? null : subject.id))}
                 className="flex min-h-[188px] w-full flex-col items-center justify-center gap-3 px-6 py-8 text-center transition hover:bg-neutral-50/90 dark:hover:bg-neutral-800/40"
               >
                 <h2 className="text-balance text-xl font-semibold leading-snug text-neutral-900 dark:text-neutral-50">
@@ -204,19 +188,19 @@ export default function TeacherDashboardPage() {
                   </p>
                 ) : null}
                 <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                  {n} ta guruh
+                  {subject.groups.length} classes
                 </p>
                 <span className="text-xs text-neutral-400" aria-hidden>
-                  {isOpen ? "\u25B2 yopish uchun bosing" : "\u25BC bosib oching"}
+                  {isOpen ? "Hide classes" : "Open classes"}
                 </span>
               </button>
 
               <div className="border-t border-neutral-100 px-4 py-2.5 text-center dark:border-neutral-800">
                 <Link
-                  href={`/teacher/corpus?subjectId=${encodeURIComponent(subject.id)}`}
+                  href={`/teacher/corpus?subjectId=${encodeURIComponent(subject.id)}&subjectName=${encodeURIComponent(subject.name)}`}
                   className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
                 >
-                  Darslik / korpus
+                  Subject materials
                 </Link>
               </div>
             </section>
@@ -233,79 +217,68 @@ export default function TeacherDashboardPage() {
             <div>
               <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
                 {selectedSubject.name}
-                <span className="font-normal text-neutral-600 dark:text-neutral-400">
-                  {" "}
-                  — guruhlar
-                </span>
+                <span className="font-normal text-neutral-600 dark:text-neutral-400"> - classes</span>
               </h2>
               {selectedSubject.code ? (
-                <p className="mt-1 font-mono text-xs text-neutral-500">
-                  {selectedSubject.code}
-                </p>
+                <p className="mt-1 font-mono text-xs text-neutral-500">{selectedSubject.code}</p>
               ) : null}
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <Link
-                href={`/teacher/corpus?subjectId=${encodeURIComponent(selectedSubject.id)}`}
+                href={`/teacher/corpus?subjectId=${encodeURIComponent(selectedSubject.id)}&subjectName=${encodeURIComponent(selectedSubject.name)}`}
                 className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
               >
-                Darslik / korpus
+                Subject materials
               </Link>
               <button
                 type="button"
                 onClick={() => setOpenSubjectId(null)}
                 className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800"
               >
-                Panelni yopish
+                Close panel
               </button>
             </div>
           </div>
 
           <div className="pt-4">
             {selectedSubject.groups.length === 0 ? (
-              <p className="text-sm text-neutral-500">
-                Bu fan uchun guruh yo{"'"}q.
-              </p>
+              <p className="text-sm text-neutral-500">No classes for this subject yet.</p>
             ) : (
               <ul className="space-y-3">
-                {selectedSubject.groups.map((g) => (
+                {selectedSubject.groups.map((group) => (
                   <li
-                    key={g.id}
+                    key={group.id}
                     className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white px-4 py-3 dark:border-neutral-700 dark:bg-neutral-900/80"
                   >
                     <div>
                       <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                        {g.name}
+                        {group.name}
                       </p>
-                      <p className="font-mono text-xs text-neutral-500">
-                        {g.id}
-                      </p>
-                      {lastCodes[g.id] ? (
+                      <p className="font-mono text-xs text-neutral-500">{group.id}</p>
+                      {lastCodes[group.id] ? (
                         <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-400">
-                          Yangi kod:{" "}
+                          Latest code:{" "}
                           <code className="rounded bg-emerald-100 px-1.5 py-0.5 font-mono dark:bg-emerald-950/60">
-                            {lastCodes[g.id]}
+                            {lastCodes[group.id]}
                           </code>{" "}
-                          (nusxa olindi)
+                          copied to clipboard
                         </p>
                       ) : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => void handleJoinCode(g.id)}
-                        disabled={busyGroupId === g.id}
+                        onClick={() => void handleJoinCode(group.id)}
+                        disabled={busyGroupId === group.id}
                         className="rounded-md bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-emerald-600"
                       >
-                        {busyGroupId === g.id
-                          ? "Kutilmoqda\u2026"
-                          : "Join kod yaratish"}
+                        {busyGroupId === group.id ? "Creating..." : "Create join code"}
                       </button>
                       <Link
-                        href={`/teacher/groups/${encodeURIComponent(g.id)}`}
+                        href={`/teacher/groups/${encodeURIComponent(group.id)}`}
                         className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-800 hover:bg-neutral-100 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-800"
                       >
-                        Guruh ish maydoni
+                        Open class workspace
                       </Link>
                     </div>
                   </li>
@@ -317,11 +290,8 @@ export default function TeacherDashboardPage() {
       ) : null}
 
       <p className="text-sm text-neutral-500">
-        <Link
-          href="/teacher/structure"
-          className="text-blue-600 hover:underline dark:text-blue-400"
-        >
-          Tuzilma (fan va guruh boshqaruvi)
+        <Link href="/teacher/structure" className="text-blue-600 hover:underline dark:text-blue-400">
+          Structure (subjects and classes)
         </Link>
       </p>
     </div>

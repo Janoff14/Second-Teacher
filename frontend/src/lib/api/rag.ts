@@ -7,6 +7,16 @@ export type TextbookIngestBody = {
   text: string;
 };
 
+export type TextbookSource = {
+  id: string;
+  subjectId: string;
+  title: string;
+  versionLabel: string;
+  createdAt: string;
+  originalFileName?: string | null;
+  sourceFormat?: "pdf" | "docx" | "doc" | "txt" | null;
+};
+
 export type RagQueryBody = {
   query: string;
   groupId: string;
@@ -49,6 +59,34 @@ export async function ingestTextbook(body: TextbookIngestBody) {
   return apiRequest<unknown>("/rag/sources/textbooks", {
     method: "POST",
     body: JSON.stringify(body),
+  });
+}
+
+export async function uploadTextbookFile(params: {
+  subjectId: string;
+  file: File;
+  title?: string;
+  versionLabel?: string;
+}) {
+  const form = new FormData();
+  form.append("subjectId", params.subjectId);
+  form.append("file", params.file);
+  if (params.title?.trim()) form.append("title", params.title.trim());
+  if (params.versionLabel?.trim()) form.append("versionLabel", params.versionLabel.trim());
+  return apiRequest<{
+    source: TextbookSource;
+    chunksCreated: number;
+    extractedCharacters: number;
+  }>("/rag/sources/textbooks/upload", {
+    method: "POST",
+    body: form,
+  });
+}
+
+export async function listTextbookSources(subjectId: string) {
+  const q = new URLSearchParams({ subjectId });
+  return apiRequest<TextbookSource[]>(`/rag/sources/textbooks?${q.toString()}`, {
+    method: "GET",
   });
 }
 
@@ -140,6 +178,13 @@ export function pickCitation(hit: Record<string, unknown>): string | null {
   if (meta && typeof meta === "object" && meta !== null) {
     const m = meta as Record<string, unknown>;
     if (typeof m.page === "number") return `p.${m.page}`;
+  }
+  const citation = hit.citation;
+  if (citation && typeof citation === "object" && citation !== null) {
+    const nested = citation as Record<string, unknown>;
+    if (typeof nested.anchor === "string" && nested.anchor.trim()) {
+      return nested.anchor;
+    }
   }
   return null;
 }

@@ -2,13 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CorpusSearchPanel } from "@/components/rag/CorpusSearchPanel";
-import {
-  parseAgentReply,
-  studentAgentChat,
-  teacherAgentChat,
-} from "@/lib/api/agent";
 import { listGroups, listSubjects } from "@/lib/api/academic";
 import type { Group, Subject } from "@/lib/api/academic";
+import { parseAgentReply, studentAgentChat, teacherAgentChat } from "@/lib/api/agent";
 import { useAuthStore } from "@/stores/auth-store";
 
 type Role = "teacher" | "student";
@@ -37,111 +33,116 @@ export function AgentChatSession({
   fixedSubjectId,
 }: {
   variant: Role;
-  /** When set (teacher), group is locked — e.g. group workspace page. */
   fixedGroupId?: string;
   fixedSubjectId?: string;
 }) {
-  const activeGroupId = useAuthStore((s) => s.activeGroupId);
-  const showGroupSelectors =
-    variant === "teacher" && !fixedGroupId?.trim();
+  const activeGroupId = useAuthStore((state) => state.activeGroupId);
+  const showGroupSelectors = variant === "teacher" && !fixedGroupId?.trim();
   const storeGroupId = variant === "student";
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [subjectId, setSubjectId] = useState("");
   const [chatGroupId, setChatGroupId] = useState("");
-
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [corpusSync, setCorpusSync] = useState({ q: "", token: 0 });
+  const [materialsSync, setMaterialsSync] = useState({ q: "", token: 0 });
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const locked = fixedGroupId?.trim();
-    if (locked) {
-      setChatGroupId(locked);
+    const lockedGroupId = fixedGroupId?.trim();
+    if (lockedGroupId) {
+      setChatGroupId(lockedGroupId);
       if (fixedSubjectId?.trim()) setSubjectId(fixedSubjectId.trim());
       return;
     }
+
     if (!showGroupSelectors) {
       if (activeGroupId) setChatGroupId(activeGroupId);
       return;
     }
+
     void (async () => {
       const res = await listSubjects();
-      if (res.ok && Array.isArray(res.data)) setSubjects(res.data);
+      if (res.ok && Array.isArray(res.data)) {
+        setSubjects(res.data);
+      }
     })();
-  }, [showGroupSelectors, activeGroupId, fixedGroupId, fixedSubjectId]);
+  }, [activeGroupId, fixedGroupId, fixedSubjectId, showGroupSelectors]);
 
   useEffect(() => {
-    if (!showGroupSelectors || !subjectId) {
+    if (!showGroupSelectors || !subjectId.trim()) {
       setGroups([]);
       return;
     }
+
     void (async () => {
       const res = await listGroups(subjectId);
-      if (res.ok && Array.isArray(res.data)) setGroups(res.data);
+      if (res.ok && Array.isArray(res.data)) {
+        setGroups(res.data);
+      }
     })();
-  }, [subjectId, showGroupSelectors]);
+  }, [showGroupSelectors, subjectId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const effectiveGroupId = useCallback(() => {
+    if (fixedGroupId?.trim()) return fixedGroupId.trim();
     if (showGroupSelectors) return chatGroupId.trim();
     return chatGroupId.trim() || (activeGroupId ?? "").trim();
-  }, [showGroupSelectors, chatGroupId, activeGroupId]);
+  }, [activeGroupId, chatGroupId, fixedGroupId, showGroupSelectors]);
 
-  async function handleSend(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSend(event: React.FormEvent) {
+    event.preventDefault();
     const text = input.trim();
-    const gid = effectiveGroupId();
-    if (!text || !gid) {
+    const currentGroupId = effectiveGroupId();
+    if (!text || !currentGroupId) {
       setError(
         variant === "teacher"
-          ? "Select a group and enter a message."
-          : "Set group context and enter a message.",
+          ? "Select a class and enter a message."
+          : "Join a class or set the class context, then enter a message.",
       );
       return;
     }
+
     setSending(true);
     setError(null);
-    const userMsg: ChatMessage = {
-      id: `u-${Date.now()}`,
-      role: "user",
-      content: text,
-    };
-    setMessages((m) => [...m, userMsg]);
+    setMessages((current) => [
+      ...current,
+      { id: `u-${Date.now()}`, role: "user", content: text },
+    ]);
     setInput("");
 
     const res =
       variant === "teacher"
-        ? await teacherAgentChat({ message: text, groupId: gid })
-        : await studentAgentChat({ message: text, groupId: gid });
+        ? await teacherAgentChat({ message: text, groupId: currentGroupId })
+        : await studentAgentChat({ message: text, groupId: currentGroupId });
 
     setSending(false);
     if (!res.ok) {
       setError(res.error.message);
       return;
     }
+
     const reply = parseAgentReply(res.data);
-    setMessages((m) => [
-      ...m,
+    setMessages((current) => [
+      ...current,
       {
         id: `a-${Date.now()}`,
         role: "assistant",
-        content: reply || "(Empty reply — check parseAgentReply / API shape.)",
+        content: reply || "(Empty reply - check agent response parsing.)",
       },
     ]);
   }
 
-  function sendSnippetToCorpus(snippet: string) {
+  function sendSnippetToMaterials(snippet: string) {
     const q = snippet.slice(0, 500).trim();
     if (!q) return;
-    setCorpusSync((s) => ({ q, token: s.token + 1 }));
+    setMaterialsSync((state) => ({ q, token: state.token + 1 }));
   }
 
   return (
@@ -149,85 +150,87 @@ export function AgentChatSession({
       <div className="flex min-h-[420px] flex-col">
         <div className="mb-4 space-y-3 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
           <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
-            {fixedGroupId?.trim() ? "Guruh konteksti" : "Group scope"}
+            {fixedGroupId?.trim() ? "Class context" : "Choose class"}
           </h2>
-          {fixedGroupId?.trim() && (
+
+          {fixedGroupId?.trim() ? (
             <p className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
               groupId: {fixedGroupId.trim()}
             </p>
-          )}
-          {showGroupSelectors && (
+          ) : null}
+
+          {showGroupSelectors ? (
             <div className="flex flex-wrap gap-2">
               <select
                 value={subjectId}
-                onChange={(e) => {
-                  setSubjectId(e.target.value);
+                onChange={(event) => {
+                  setSubjectId(event.target.value);
                   setChatGroupId("");
                 }}
                 className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
               >
-                <option value="">Subject…</option>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
+                <option value="">Subject...</option>
+                {subjects.map((subject) => (
+                  <option key={subject.id} value={subject.id}>
+                    {subject.name}
                   </option>
                 ))}
               </select>
               <select
                 value={chatGroupId}
-                onChange={(e) => setChatGroupId(e.target.value)}
+                onChange={(event) => setChatGroupId(event.target.value)}
                 className="rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
-                disabled={!subjectId}
+                disabled={!subjectId.trim()}
               >
-                <option value="">Group…</option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
+                <option value="">Class...</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
                   </option>
                 ))}
               </select>
             </div>
-          )}
-          {!showGroupSelectors && (
+          ) : !fixedGroupId?.trim() ? (
             <input
               placeholder="groupId"
               value={chatGroupId}
-              onChange={(e) => setChatGroupId(e.target.value)}
+              onChange={(event) => setChatGroupId(event.target.value)}
               className="w-full max-w-md rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm dark:border-neutral-600 dark:bg-neutral-950"
             />
-          )}
+          ) : null}
         </div>
 
         <ErrorBox message={error} />
 
         <div className="flex-1 space-y-4 overflow-y-auto rounded-lg border border-neutral-200 bg-neutral-50/50 p-4 dark:border-neutral-800 dark:bg-neutral-900/30">
-          {messages.length === 0 && (
+          {messages.length === 0 ? (
             <p className="text-sm text-neutral-500">
-              Ask a question grounded in the class corpus (ingest textbooks in
-              Corpus first).
+              Ask about the class materials or recent performance. Use the search panel on the right
+              to double-check the exact source passage.
             </p>
-          )}
-          {messages.map((m) => (
+          ) : null}
+
+          {messages.map((message) => (
             <div
-              key={m.id}
+              key={message.id}
               className={
-                m.role === "user"
+                message.role === "user"
                   ? "ml-8 rounded-lg bg-blue-50 px-3 py-2 text-sm dark:bg-blue-950/40"
                   : "mr-8 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm dark:border-neutral-700 dark:bg-neutral-950"
               }
             >
               <p className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">
-                {m.content}
+                {message.content}
               </p>
-              {m.role === "assistant" && (
+              {message.role === "assistant" ? (
                 <button
                   type="button"
-                  onClick={() => sendSnippetToCorpus(m.content)}
+                  onClick={() => sendSnippetToMaterials(message.content)}
                   className="mt-2 text-xs text-blue-600 hover:underline dark:text-blue-400"
                 >
-                  Search in corpus (side panel) →
+                  Search this in the materials panel
                 </button>
-              )}
+              ) : null}
             </div>
           ))}
           <div ref={bottomRef} />
@@ -236,9 +239,9 @@ export function AgentChatSession({
         <form onSubmit={handleSend} className="mt-4 flex gap-2">
           <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(event) => setInput(event.target.value)}
             rows={2}
-            placeholder="Message…"
+            placeholder="Message..."
             className="min-h-[44px] flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
             disabled={sending}
           />
@@ -247,7 +250,7 @@ export function AgentChatSession({
             disabled={sending}
             className="self-end rounded-md bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
           >
-            {sending ? "…" : "Send"}
+            {sending ? "..." : "Send"}
           </button>
         </form>
       </div>
@@ -256,8 +259,11 @@ export function AgentChatSession({
         <CorpusSearchPanel
           showGroupSelectors={showGroupSelectors}
           storeGroupId={storeGroupId}
-          syncQuery={corpusSync.token > 0 ? corpusSync : undefined}
+          syncQuery={materialsSync.token > 0 ? materialsSync : undefined}
           alignGroupId={fixedGroupId?.trim() || chatGroupId}
+          fixedGroupId={fixedGroupId}
+          title="Check the source while you chat"
+          description="Search the same class materials in parallel so you can confirm what the AI should cite."
         />
       </div>
     </div>

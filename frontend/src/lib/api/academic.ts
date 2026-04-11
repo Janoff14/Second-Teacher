@@ -94,7 +94,14 @@ export type JoinCodeRecord = {
 
 export type GroupStudent = {
   studentId: string;
+  displayName?: string | null;
+  email?: string | null;
   enrolledAt: string;
+  attemptCount?: number;
+  lastAttemptAt?: string | null;
+  latestScorePct?: number | null;
+  riskLevel?: "stable" | "watchlist" | "at_risk" | null;
+  riskReason?: string | null;
 };
 
 export async function listSubjects() {

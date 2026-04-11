@@ -16,7 +16,6 @@ const adminTabs: NavItem[] = [
 
 const teacherTabs: NavItem[] = [
   { href: "/teacher", label: "Bosh panel" },
-  { href: "/teacher/corpus", label: "Corpus" },
   { href: "/notifications", label: "Bildirishnomalar" },
 ];
 

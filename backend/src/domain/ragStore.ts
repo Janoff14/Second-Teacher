@@ -13,6 +13,8 @@ export interface TextbookSourceRecord {
   versionLabel: string;
   createdBy: string;
   createdAt: string;
+  originalFileName?: string;
+  sourceFormat?: "pdf" | "docx" | "doc" | "txt";
 }
 
 export interface TextbookCitationLocation {
@@ -304,6 +306,8 @@ export async function ingestTextbook(params: {
   versionLabel: string;
   text: string;
   createdBy: string;
+  originalFileName?: string;
+  sourceFormat?: "pdf" | "docx" | "doc" | "txt";
 }): Promise<{ source: TextbookSourceRecord; chunksCreated: number }> {
   return runWithRetry("ingest_textbook", 3, () => ingestTextbookCore(params));
 }
@@ -314,6 +318,8 @@ async function ingestTextbookCore(params: {
   versionLabel: string;
   text: string;
   createdBy: string;
+  originalFileName?: string;
+  sourceFormat?: "pdf" | "docx" | "doc" | "txt";
 }): Promise<{ source: TextbookSourceRecord; chunksCreated: number }> {
   const now = new Date().toISOString();
   const source: TextbookSourceRecord = {
@@ -323,6 +329,8 @@ async function ingestTextbookCore(params: {
     versionLabel: params.versionLabel,
     createdBy: params.createdBy,
     createdAt: now,
+    ...(params.originalFileName ? { originalFileName: params.originalFileName } : {}),
+    ...(params.sourceFormat ? { sourceFormat: params.sourceFormat } : {}),
   };
   textbookSources.push(source);
 

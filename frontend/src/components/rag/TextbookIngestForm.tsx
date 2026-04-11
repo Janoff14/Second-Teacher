@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listSubjects } from "@/lib/api/academic";
 import type { Subject } from "@/lib/api/academic";
-import { ingestTextbook } from "@/lib/api/rag";
+import { uploadTextbookFile, type TextbookSource } from "@/lib/api/rag";
 
 function ErrorBox({ message }: { message: string | null }) {
   if (!message) return null;
@@ -17,147 +17,206 @@ function ErrorBox({ message }: { message: string | null }) {
   );
 }
 
+type TextbookIngestFormProps = {
+  initialSubjectId?: string;
+  fixedSubjectId?: string;
+  fixedSubjectName?: string;
+  onUploaded?: (source: TextbookSource) => void | Promise<void>;
+};
+
+function inferDefaultVersionLabel() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function TextbookIngestForm({
   initialSubjectId,
-}: {
-  /** URL dan: `/teacher/corpus?subjectId=` */
-  initialSubjectId?: string;
-} = {}) {
+  fixedSubjectId,
+  fixedSubjectName,
+  onUploaded,
+}: TextbookIngestFormProps = {}) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [subjectId, setSubjectId] = useState(initialSubjectId ?? "");
+  const [subjectId, setSubjectId] = useState(fixedSubjectId ?? initialSubjectId ?? "");
   const [title, setTitle] = useState("");
-  const [versionLabel, setVersionLabel] = useState("");
-  const [text, setText] = useState("");
+  const [versionLabel, setVersionLabel] = useState(inferDefaultVersionLabel);
+  const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const subjectLocked = Boolean(fixedSubjectId?.trim());
+  const resolvedSubjectName = useMemo(() => {
+    if (fixedSubjectName?.trim()) return fixedSubjectName.trim();
+    return subjects.find((subject) => subject.id === subjectId)?.name ?? "";
+  }, [fixedSubjectName, subjectId, subjects]);
 
   const loadSubjects = useCallback(async () => {
+    if (subjectLocked) return;
     const res = await listSubjects();
     if (!res.ok) return;
-    const list = res.data ?? [];
-    setSubjects(Array.isArray(list) ? list : []);
-  }, []);
+    setSubjects(Array.isArray(res.data) ? res.data : []);
+  }, [subjectLocked]);
 
   useEffect(() => {
     void loadSubjects();
   }, [loadSubjects]);
 
   useEffect(() => {
-    if (initialSubjectId) setSubjectId(initialSubjectId);
-  }, [initialSubjectId]);
+    if (fixedSubjectId?.trim()) {
+      setSubjectId(fixedSubjectId.trim());
+    }
+  }, [fixedSubjectId]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!subjectId.trim() || !title.trim() || !versionLabel.trim() || !text.trim()) {
-      setError("Fill subject, title, version, and text.");
+  useEffect(() => {
+    if (!file || title.trim()) return;
+    const inferredTitle = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+    if (inferredTitle) {
+      setTitle(inferredTitle);
+    }
+  }, [file, title]);
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!subjectId.trim()) {
+      setError("Select the subject that this textbook belongs to.");
       return;
     }
+    if (!file) {
+      setError("Choose a PDF, DOCX, DOC, TXT, or Markdown file to upload.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setSuccess(null);
-    const res = await ingestTextbook({
+
+    const res = await uploadTextbookFile({
       subjectId: subjectId.trim(),
-      title: title.trim(),
-      versionLabel: versionLabel.trim(),
-      text,
+      file,
+      ...(title.trim() ? { title: title.trim() } : {}),
+      ...(versionLabel.trim() ? { versionLabel: versionLabel.trim() } : {}),
     });
+
     setLoading(false);
     if (!res.ok) {
       setError(res.error.message);
       return;
     }
-    setSuccess("Textbook submitted for ingestion.");
-    setText("");
+
+    const uploadedSource = res.data?.source;
+    setSuccess(
+      uploadedSource
+        ? `${uploadedSource.title} was uploaded and prepared for AI search automatically.`
+        : "Textbook uploaded and prepared for AI search automatically.",
+    );
+    setFile(null);
+    setTitle("");
+    setVersionLabel(inferDefaultVersionLabel());
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    await onUploaded?.(uploadedSource as TextbookSource);
   }
 
   return (
-    <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-      <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
-        Textbook ingest
-      </h2>
-      <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-        <code className="rounded bg-neutral-100 px-1 text-xs dark:bg-neutral-800">
-          POST /rag/sources/textbooks
-        </code>
-      </p>
+    <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
+          Upload textbook
+        </h2>
+        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+          Upload the book file once. We extract the text, build the reader view, and prepare it
+          for AI search immediately after upload.
+        </p>
+      </div>
 
       <ErrorBox message={error} />
-      {success && (
+      {success ? (
         <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900 dark:border-green-900/40 dark:bg-green-950/30 dark:text-green-100">
           {success}
         </p>
-      )}
+      ) : null}
 
-      <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            Subject
-          </label>
-          <select
-            value={subjectId}
-            onChange={(e) => setSubjectId(e.target.value)}
-            className="mt-1 w-full max-w-md rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
-            disabled={loading}
-            required
-          >
-            <option value="">Select subject…</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
-          {subjects.length === 0 && (
-            <p className="mt-1 text-xs text-neutral-500">
-              No subjects — create one under Structure first.
+      <form onSubmit={handleSubmit} className="mt-5 space-y-4">
+        {subjectLocked ? (
+          <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm dark:border-neutral-800 dark:bg-neutral-900/40">
+            <p className="text-neutral-500 dark:text-neutral-400">Subject</p>
+            <p className="mt-1 font-medium text-neutral-900 dark:text-neutral-100">
+              {resolvedSubjectName || "Selected subject"}
             </p>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+              Subject
+            </label>
+            <select
+              value={subjectId}
+              onChange={(event) => setSubjectId(event.target.value)}
+              className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+              disabled={loading}
+              required
+            >
+              <option value="">Choose a subject...</option>
+              {subjects.map((subject) => (
+                <option key={subject.id} value={subject.id}>
+                  {subject.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div>
           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            Title
+            Textbook file
           </label>
           <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.txt,.md,.markdown,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+            onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            className="mt-1 block w-full rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-3 py-3 text-sm text-neutral-700 file:mr-4 file:rounded-md file:border-0 file:bg-neutral-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white dark:border-neutral-700 dark:bg-neutral-900/40 dark:text-neutral-200 dark:file:bg-neutral-100 dark:file:text-neutral-900"
             disabled={loading}
             required
           />
+          <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+            Accepted formats: PDF, DOCX, DOC, TXT, and Markdown. Large scanned PDFs may need OCR
+            before upload.
+          </p>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            Version label
-          </label>
-          <input
-            value={versionLabel}
-            onChange={(e) => setVersionLabel(e.target.value)}
-            placeholder="e.g. 2025-01"
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
-            disabled={loading}
-            required
-          />
+
+        <div className="grid gap-4 md:grid-cols-[1.4fr_0.8fr]">
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+              Display title
+            </label>
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Optional. We can reuse the file name."
+              className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+              disabled={loading}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+              Version label
+            </label>
+            <input
+              value={versionLabel}
+              onChange={(event) => setVersionLabel(event.target.value)}
+              placeholder="Optional"
+              className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+              disabled={loading}
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            Full text
-          </label>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            rows={12}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm dark:border-neutral-600 dark:bg-neutral-950"
-            disabled={loading}
-            required
-          />
-        </div>
+
         <button
           type="submit"
           disabled={loading}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
+          className="rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
         >
-          {loading ? "Submitting…" : "Ingest textbook"}
+          {loading ? "Uploading..." : "Upload and prepare for AI"}
         </button>
       </form>
     </section>

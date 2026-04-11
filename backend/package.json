@@ -23,15 +23,20 @@
   "dependencies": {
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.103.0",
+    "@types/multer": "^2.1.0",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.1",
     "express": "^5.2.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
+    "mammoth": "^1.12.0",
+    "multer": "^2.1.1",
     "openai": "^6.34.0",
+    "pdf-parse": "^2.4.5",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
+    "word-extractor": "^1.0.4",
     "zod": "^4.3.6"
   },
   "devDependencies": {

@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
-import { canTeacherManageGroup, getGroup, isStudentInGroup } from "../domain/academicStore";
+import { canTeacherManageGroup, getGroup, isStudentInGroup, listEnrollmentsForGroup } from "../domain/academicStore";
 import {
   createDraft,
   getDraft,
   getVersion,
+  listAttemptsForVersion,
   listDrafts,
   listAttemptsForStudent,
   listPublishedVersionsForGroup,
@@ -16,10 +17,20 @@ import {
 import { refreshInsightsAfterAttempt } from "../domain/insightsStore";
 import { indexPublishedAssessmentVersion } from "../domain/ragStore";
 import { appendAuditLog } from "../domain/auditStore";
+import { getUserById } from "../domain/userStore";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 
 export const assessmentsRouter = Router();
+
+function inferAssessmentType(title: string): "practice" | "quiz" | "test" | "exam" | "assessment" {
+  const normalized = title.trim().toLowerCase();
+  if (normalized.startsWith("practice")) return "practice";
+  if (normalized.startsWith("quiz")) return "quiz";
+  if (normalized.startsWith("test")) return "test";
+  if (normalized.startsWith("exam")) return "exam";
+  return "assessment";
+}
 
 const createDraftSchema = z.object({
   groupId: z.string().min(1),
@@ -201,6 +212,104 @@ assessmentsRouter.post(
         meta: { draftId, itemCount: version.items.length },
       });
       res.status(201).json({ data: version });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+assessmentsRouter.get(
+  "/groups/:groupId/results-summary",
+  requireAuth,
+  requireRole(["admin", "teacher"]),
+  async (req, res, next) => {
+    try {
+      const groupId = req.params.groupId;
+      if (!groupId || Array.isArray(groupId)) {
+        throw new Error("Group id required");
+      }
+      const user = req.user!;
+      if (!canTeacherManageGroup(user.userId, user.role, groupId)) {
+        const err = new Error("Forbidden for this group") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 403;
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+
+      const enrolledCount = listEnrollmentsForGroup(groupId).length;
+      const versions = listPublishedVersionsForGroup(groupId).sort(
+        (a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt),
+      );
+
+      const assessments = await Promise.all(
+        versions.map(async (version) => {
+          const attempts = listAttemptsForVersion(version.id).sort(
+            (a, b) => Date.parse(b.submittedAt) - Date.parse(a.submittedAt),
+          );
+          const results = await Promise.all(
+            attempts.map(async (attempt) => {
+              const student = await getUserById(attempt.studentId);
+              const scorePct =
+                attempt.maxScore > 0
+                  ? Math.round((attempt.totalScore / attempt.maxScore) * 1000) / 10
+                  : 0;
+              return {
+                attemptId: attempt.id,
+                studentId: attempt.studentId,
+                studentName: student?.displayName ?? null,
+                studentEmail: student?.email ?? null,
+                submittedAt: attempt.submittedAt,
+                totalScore: attempt.totalScore,
+                maxScore: attempt.maxScore,
+                scorePct,
+              };
+            }),
+          );
+          const averageScorePct =
+            results.length > 0
+              ? Math.round(
+                  (results.reduce((sum, row) => sum + row.scorePct, 0) / results.length) * 10,
+                ) / 10
+              : null;
+          const highestScorePct =
+            results.length > 0 ? Math.max(...results.map((row) => row.scorePct)) : null;
+          return {
+            id: version.id,
+            title: version.title,
+            type: inferAssessmentType(version.title),
+            publishedAt: version.publishedAt,
+            windowOpensAtUtc: version.windowOpensAtUtc,
+            windowClosesAtUtc: version.windowClosesAtUtc,
+            windowTimezone: version.windowTimezone,
+            itemCount: version.items.length,
+            enrolledCount,
+            attemptCount: results.length,
+            averageScorePct,
+            highestScorePct,
+            latestSubmittedAt: results[0]?.submittedAt ?? null,
+            results,
+          };
+        }),
+      );
+
+      const allResults = assessments.flatMap((assessment) => assessment.results);
+      const overallAverageScorePct =
+        allResults.length > 0
+          ? Math.round(
+              (allResults.reduce((sum, row) => sum + row.scorePct, 0) / allResults.length) * 10,
+            ) / 10
+          : null;
+
+      res.status(200).json({
+        data: {
+          groupId,
+          enrolledCount,
+          assessmentCount: assessments.length,
+          totalAttemptCount: allResults.length,
+          overallAverageScorePct,
+          assessments,
+        },
+      });
     } catch (e) {
       next(e);
     }

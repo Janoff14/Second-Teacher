@@ -1,4 +1,6 @@
+import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
+import multer from "multer";
 import { z } from "zod";
 import {
   canTeacherAccessSubject,
@@ -10,13 +12,21 @@ import {
   getTextbookReaderDocument,
   getTextbookSourceById,
   ingestTextbook,
+  listTextbookSourcesForSubject,
   queryCorpus,
 } from "../domain/ragStore";
 import { appendAuditLog } from "../domain/auditStore";
+import { extractTextFromUploadedDocument } from "../lib/documentText";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 
 export const ragRouter = Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 25 * 1024 * 1024,
+  },
+});
 
 const textbookSchema = z.object({
   subjectId: z.string().min(1),
@@ -24,6 +34,53 @@ const textbookSchema = z.object({
   versionLabel: z.string().min(1),
   text: z.string().min(1),
 });
+
+function uploadTextbookFile(req: Request, res: Response, next: NextFunction) {
+  upload.single("file")(req, res, (err) => {
+    if (!err) {
+      next();
+      return;
+    }
+    const wrapped = new Error(
+      err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE"
+        ? "Textbook file is too large. Upload a file up to 25 MB."
+        : err.message,
+    ) as Error & { statusCode?: number; code?: string };
+    wrapped.statusCode = 400;
+    wrapped.code =
+      err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE"
+        ? "FILE_TOO_LARGE"
+        : "UPLOAD_FAILED";
+    next(wrapped);
+  });
+}
+
+ragRouter.get(
+  "/rag/sources/textbooks",
+  requireAuth,
+  requireRole(["admin", "teacher"]),
+  (req, res, next) => {
+    try {
+      const subjectId = typeof req.query.subjectId === "string" ? req.query.subjectId.trim() : "";
+      if (!subjectId) {
+        const err = new Error("subjectId is required") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 400;
+        err.code = "VALIDATION_ERROR";
+        throw err;
+      }
+      const user = req.user!;
+      if (!canTeacherAccessSubject(user.userId, user.role, subjectId)) {
+        const err = new Error("Forbidden for this subject") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 403;
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+      res.status(200).json({ data: listTextbookSourcesForSubject(subjectId) });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
 
 ragRouter.post(
   "/rag/sources/textbooks",
@@ -61,6 +118,82 @@ ragRouter.post(
         },
       });
       res.status(201).json({ data: result });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+ragRouter.post(
+  "/rag/sources/textbooks/upload",
+  requireAuth,
+  requireRole(["admin", "teacher"]),
+  uploadTextbookFile,
+  async (req, res, next) => {
+    try {
+      const user = req.user!;
+      const subjectId = typeof req.body.subjectId === "string" ? req.body.subjectId.trim() : "";
+      const versionLabelRaw = typeof req.body.versionLabel === "string" ? req.body.versionLabel.trim() : "";
+      const titleRaw = typeof req.body.title === "string" ? req.body.title.trim() : "";
+      if (!subjectId) {
+        const err = new Error("subjectId is required") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 400;
+        err.code = "VALIDATION_ERROR";
+        throw err;
+      }
+      if (!canTeacherAccessSubject(user.userId, user.role, subjectId)) {
+        const err = new Error("Forbidden for this subject") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 403;
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+      const file = req.file;
+      if (!file) {
+        const err = new Error("Choose a textbook file to upload") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 400;
+        err.code = "FILE_REQUIRED";
+        throw err;
+      }
+
+      const extracted = await extractTextFromUploadedDocument({
+        buffer: file.buffer,
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+      });
+      const versionLabel = versionLabelRaw || new Date().toISOString().slice(0, 10);
+      const title = titleRaw || extracted.suggestedTitle;
+      const result = await ingestTextbook({
+        subjectId,
+        title,
+        versionLabel,
+        text: extracted.text,
+        createdBy: user.userId,
+        originalFileName: extracted.originalFileName,
+        sourceFormat: extracted.sourceFormat,
+      });
+
+      appendAuditLog({
+        ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
+        actorId: user.userId,
+        actorRole: user.role,
+        action: "upload_document",
+        targetId: result.source.id,
+        detail: `${title} textbook uploaded`,
+        meta: {
+          subjectId,
+          versionLabel,
+          chunksCreated: result.chunksCreated,
+          originalFileName: extracted.originalFileName,
+          sourceFormat: extracted.sourceFormat,
+          extractedCharacters: extracted.text.length,
+        },
+      });
+      res.status(201).json({
+        data: {
+          ...result,
+          extractedCharacters: extracted.text.length,
+        },
+      });
     } catch (e) {
       next(e);
     }

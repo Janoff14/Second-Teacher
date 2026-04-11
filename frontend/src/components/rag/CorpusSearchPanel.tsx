@@ -1,14 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { listGroups, listSubjects } from "@/lib/api/academic";
 import type { Group, Subject } from "@/lib/api/academic";
-import {
-  normalizeQueryHits,
-  pickCitation,
-  pickSnippet,
-  queryCorpus,
-} from "@/lib/api/rag";
+import { normalizeQueryHits, pickCitation, pickSnippet, queryCorpus } from "@/lib/api/rag";
 import { useAuthStore } from "@/stores/auth-store";
 
 function ErrorBox({ message }: { message: string | null }) {
@@ -24,269 +20,325 @@ function ErrorBox({ message }: { message: string | null }) {
 }
 
 type CorpusSearchPanelProps = {
-  /** Load subject/group pickers (teacher flow). */
   showGroupSelectors?: boolean;
-  /** Pre-fill group from enrollment (student). */
   storeGroupId?: boolean;
-  /** When `token` changes, copy `q` into the query field (e.g. from agent chat). */
   syncQuery?: { q: string; token: number };
-  /** Keep group selector aligned with agent chat (same corpus scope). */
   alignGroupId?: string;
+  fixedGroupId?: string;
+  title?: string;
+  description?: string;
 };
+
+function readCitationObject(hit: Record<string, unknown>): Record<string, unknown> | null {
+  const citation = hit.citation;
+  if (!citation || typeof citation !== "object" || Array.isArray(citation)) {
+    return null;
+  }
+  return citation as Record<string, unknown>;
+}
+
+function pickReaderHref(hit: Record<string, unknown>, groupId: string): string | null {
+  const citation = readCitationObject(hit);
+  const readerPath = typeof citation?.readerPath === "string" ? citation.readerPath : null;
+  if (!readerPath || !groupId.trim()) return null;
+  const separator = readerPath.includes("?") ? "&" : "?";
+  return `${readerPath}${separator}groupId=${encodeURIComponent(groupId.trim())}`;
+}
+
+function pickLocationSummary(hit: Record<string, unknown>): string | null {
+  const citation = readCitationObject(hit);
+  const location =
+    citation?.textbookLocation &&
+    typeof citation.textbookLocation === "object" &&
+    !Array.isArray(citation.textbookLocation)
+      ? (citation.textbookLocation as Record<string, unknown>)
+      : null;
+  if (!location) return null;
+
+  const chapterNumber =
+    typeof location.chapterNumber === "number" ? `Chapter ${location.chapterNumber}` : null;
+  const chapterTitle = typeof location.chapterTitle === "string" ? location.chapterTitle : null;
+  const pageNumber = typeof location.pageNumber === "number" ? `Page ${location.pageNumber}` : null;
+  return [chapterNumber, chapterTitle, pageNumber].filter(Boolean).join(" - ") || null;
+}
+
+function formatScore(hit: Record<string, unknown>) {
+  const value = hit.score;
+  if (typeof value !== "number" || Number.isNaN(value)) return null;
+  return `${Math.round(value * 100)}% match`;
+}
 
 export function CorpusSearchPanel({
   showGroupSelectors = false,
   storeGroupId = false,
   syncQuery,
   alignGroupId,
+  fixedGroupId,
+  title = "Search uploaded materials",
+  description = "Ask a question about the uploaded textbook and open the exact passage in the reader.",
 }: CorpusSearchPanelProps) {
-  const activeGroupId = useAuthStore((s) => s.activeGroupId);
+  const activeGroupId = useAuthStore((state) => state.activeGroupId);
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [subjectId, setSubjectId] = useState("");
-  const [groupId, setGroupId] = useState("");
-
+  const [groupId, setGroupId] = useState(fixedGroupId?.trim() ?? "");
   const [query, setQuery] = useState("");
-  const [topK, setTopK] = useState(8);
+  const [topK, setTopK] = useState(6);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hits, setHits] = useState<Record<string, unknown>[]>([]);
-  const [rawDebug, setRawDebug] = useState<string | null>(null);
+
+  const selectorsVisible = showGroupSelectors && !fixedGroupId?.trim();
+  const groupLocked = Boolean(fixedGroupId?.trim());
 
   const loadSubjects = useCallback(async () => {
+    if (!selectorsVisible) return;
     const res = await listSubjects();
     if (!res.ok) return;
-    const list = res.data ?? [];
-    setSubjects(Array.isArray(list) ? list : []);
-  }, []);
+    setSubjects(Array.isArray(res.data) ? res.data : []);
+  }, [selectorsVisible]);
 
-  const loadGroups = useCallback(async (sid: string) => {
-    if (!sid) {
+  const loadGroups = useCallback(async (nextSubjectId: string) => {
+    if (!selectorsVisible || !nextSubjectId.trim()) {
       setGroups([]);
       return;
     }
-    const res = await listGroups(sid);
+    const res = await listGroups(nextSubjectId.trim());
     if (!res.ok) return;
-    const list = res.data ?? [];
-    setGroups(Array.isArray(list) ? list : []);
-  }, []);
+    setGroups(Array.isArray(res.data) ? res.data : []);
+  }, [selectorsVisible]);
 
   useEffect(() => {
-    if (showGroupSelectors) void loadSubjects();
-  }, [showGroupSelectors, loadSubjects]);
+    void loadSubjects();
+  }, [loadSubjects]);
 
   useEffect(() => {
-    if (showGroupSelectors) void loadGroups(subjectId);
-    if (!subjectId) setGroupId("");
-  }, [subjectId, showGroupSelectors, loadGroups]);
+    if (!selectorsVisible) return;
+    void loadGroups(subjectId);
+    if (!subjectId.trim()) {
+      setGroupId("");
+    }
+  }, [loadGroups, selectorsVisible, subjectId]);
 
   useEffect(() => {
-    if (storeGroupId && activeGroupId && !showGroupSelectors) {
+    if (groupLocked && fixedGroupId?.trim()) {
+      setGroupId(fixedGroupId.trim());
+    }
+  }, [fixedGroupId, groupLocked]);
+
+  useEffect(() => {
+    if (storeGroupId && activeGroupId && !selectorsVisible && !groupLocked) {
       setGroupId(activeGroupId);
     }
-  }, [storeGroupId, activeGroupId, showGroupSelectors]);
+  }, [activeGroupId, groupLocked, selectorsVisible, storeGroupId]);
 
   useEffect(() => {
     if (syncQuery?.q !== undefined && syncQuery.token > 0) {
       setQuery(syncQuery.q);
     }
-  }, [syncQuery?.token, syncQuery?.q]);
+  }, [syncQuery?.q, syncQuery?.token]);
 
   useEffect(() => {
-    if (
-      alignGroupId !== undefined &&
-      alignGroupId !== groupId &&
-      alignGroupId !== ""
-    ) {
-      setGroupId(alignGroupId);
+    if (!alignGroupId?.trim() || selectorsVisible || groupLocked) return;
+    if (alignGroupId.trim() !== groupId) {
+      setGroupId(alignGroupId.trim());
     }
-  }, [alignGroupId, groupId]);
+  }, [alignGroupId, groupId, groupLocked, selectorsVisible]);
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    let effectiveGroupId = "";
-    if (showGroupSelectors) {
-      effectiveGroupId = groupId.trim();
-    } else {
-      effectiveGroupId =
-        groupId.trim() || (storeGroupId ? (activeGroupId ?? "").trim() : "");
-    }
+  const effectiveGroupId = useMemo(() => {
+    if (groupLocked && fixedGroupId?.trim()) return fixedGroupId.trim();
+    if (selectorsVisible) return groupId.trim();
+    if (groupId.trim()) return groupId.trim();
+    return storeGroupId ? (activeGroupId ?? "").trim() : "";
+  }, [activeGroupId, fixedGroupId, groupId, groupLocked, selectorsVisible, storeGroupId]);
+
+  async function handleSearch(event: React.FormEvent) {
+    event.preventDefault();
     if (!effectiveGroupId || !query.trim()) {
-      setError("Enter a query and group context.");
+      setError("Choose the class context and enter a question first.");
       return;
     }
+
     setLoading(true);
     setError(null);
-    setRawDebug(null);
     const res = await queryCorpus({
       query: query.trim(),
       groupId: effectiveGroupId,
-      topK: Number.isFinite(topK) ? topK : 8,
+      topK: Number.isFinite(topK) ? topK : 6,
     });
     setLoading(false);
+
     if (!res.ok) {
       setHits([]);
       setError(res.error.message);
       return;
     }
-    const normalized = normalizeQueryHits(res.data);
-    setHits(normalized);
-    if (normalized.length === 0 && res.data != null) {
-      setRawDebug(JSON.stringify(res.data, null, 2));
-    }
+
+    setHits(normalizeQueryHits(res.data));
   }
 
   return (
-    <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-      <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
-        Corpus search
-      </h2>
-      <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-        <code className="rounded bg-neutral-100 px-1 text-xs dark:bg-neutral-800">
-          POST /rag/query
-        </code>
-      </p>
+    <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">{title}</h2>
+        <p className="text-sm text-neutral-600 dark:text-neutral-400">{description}</p>
+      </div>
 
       <ErrorBox message={error} />
 
-      <form onSubmit={handleSearch} className="mt-4 space-y-4">
-        {showGroupSelectors && (
-          <>
+      <form onSubmit={handleSearch} className="mt-5 space-y-4">
+        {selectorsVisible ? (
+          <div className="grid gap-4 md:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
                 Subject
               </label>
               <select
                 value={subjectId}
-                onChange={(e) => setSubjectId(e.target.value)}
-                className="mt-1 w-full max-w-md rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+                onChange={(event) => setSubjectId(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
                 disabled={loading}
               >
-                <option value="">Select subject…</option>
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
+                <option value="">Choose a subject...</option>
+                {subjects.map((subject) => (
+                  <option key={subject.id} value={subject.id}>
+                    {subject.name}
                   </option>
                 ))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                Group (corpus scope)
+                Class
               </label>
               <select
                 value={groupId}
-                onChange={(e) => setGroupId(e.target.value)}
-                className="mt-1 w-full max-w-md rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
-                disabled={loading || !subjectId}
+                onChange={(event) => setGroupId(event.target.value)}
+                className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+                disabled={loading || !subjectId.trim()}
               >
-                <option value="">Select group…</option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
+                <option value="">Choose a class...</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {group.name}
                   </option>
                 ))}
               </select>
             </div>
-          </>
-        )}
-
-        {storeGroupId && !showGroupSelectors && (
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-              Group ID
-            </label>
-            <input
-              value={groupId}
-              onChange={(e) => setGroupId(e.target.value)}
-              placeholder={activeGroupId ?? "Enroll to set group"}
-              className="mt-1 w-full max-w-md rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm dark:border-neutral-600 dark:bg-neutral-950"
-              disabled={loading}
-            />
-            {!activeGroupId && (
-              <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-                Join a class first so your group is known, or paste a group id
-                manually.
-              </p>
-            )}
           </div>
-        )}
+        ) : null}
+
+        {storeGroupId && !selectorsVisible && !groupLocked ? (
+          <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm dark:border-neutral-800 dark:bg-neutral-900/40">
+            <p className="text-neutral-500 dark:text-neutral-400">Current class</p>
+            <p className="mt-1 font-mono text-xs text-neutral-700 dark:text-neutral-200">
+              {effectiveGroupId || "Join a class to unlock materials search."}
+            </p>
+          </div>
+        ) : null}
+
+        {groupLocked ? (
+          <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm dark:border-neutral-800 dark:bg-neutral-900/40">
+            <p className="text-neutral-500 dark:text-neutral-400">Class context</p>
+            <p className="mt-1 font-medium text-neutral-900 dark:text-neutral-100">
+              Results will use this class only.
+            </p>
+          </div>
+        ) : null}
 
         <div>
           <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            Query
+            Question
           </label>
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+            onChange={(event) => setQuery(event.target.value)}
+            className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
             disabled={loading}
-            placeholder="Ask or search the textbook…"
+            placeholder="Example: Which pages explain Newton's second law?"
             required
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            topK
-          </label>
-          <input
-            type="number"
-            min={1}
-            max={50}
-            value={topK}
-            onChange={(e) => setTopK(Number(e.target.value))}
-            className="mt-1 w-28 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+              Results to show
+            </label>
+            <input
+              type="number"
+              min={1}
+              max={12}
+              value={topK}
+              onChange={(event) => setTopK(Number(event.target.value))}
+              className="mt-1 w-24 rounded-xl border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+              disabled={loading}
+            />
+          </div>
+          <button
+            type="submit"
             disabled={loading}
-          />
+            className="rounded-xl bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
+          >
+            {loading ? "Searching..." : "Search materials"}
+          </button>
         </div>
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-        >
-          {loading ? "Searching…" : "Search"}
-        </button>
       </form>
 
-      {hits.length > 0 && (
+      {hits.length > 0 ? (
         <ul className="mt-6 space-y-3">
-          {hits.map((hit, i) => {
+          {hits.map((hit, index) => {
             const snippet = pickSnippet(hit);
-            const cite = pickCitation(hit);
+            const citation = pickCitation(hit);
+            const locationSummary = pickLocationSummary(hit);
+            const readerHref = pickReaderHref(hit, effectiveGroupId);
+            const score = formatScore(hit);
+
             return (
               <li
-                key={i}
-                className="rounded-md border border-neutral-200 bg-neutral-50/80 p-3 text-sm dark:border-neutral-800 dark:bg-neutral-900/40"
+                key={`${citation ?? "hit"}-${index}`}
+                className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/40"
               >
-                {cite && (
-                  <p className="mb-1 font-mono text-xs text-neutral-500">
-                    {cite}
-                  </p>
-                )}
-                <p className="whitespace-pre-wrap text-neutral-800 dark:text-neutral-200">
-                  {snippet || (
-                    <span className="text-neutral-500">
-                      (No snippet field — see raw hit below)
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="space-y-1">
+                    {locationSummary ? (
+                      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                        {locationSummary}
+                      </p>
+                    ) : null}
+                    {citation ? (
+                      <p className="font-mono text-xs text-neutral-500 dark:text-neutral-400">
+                        {citation}
+                      </p>
+                    ) : null}
+                  </div>
+                  {score ? (
+                    <span className="rounded-full bg-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
+                      {score}
                     </span>
-                  )}
+                  ) : null}
+                </div>
+
+                <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-neutral-800 dark:text-neutral-200">
+                  {snippet || "No preview text was returned for this result."}
                 </p>
-                {!snippet && (
-                  <pre className="mt-2 max-h-40 overflow-auto rounded bg-neutral-100 p-2 text-xs dark:bg-neutral-950">
-                    {JSON.stringify(hit, null, 2)}
-                  </pre>
-                )}
+
+                {readerHref ? (
+                  <div className="mt-3">
+                    <Link
+                      href={readerHref}
+                      className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                    >
+                      Open exact passage in reader
+                    </Link>
+                  </div>
+                ) : null}
               </li>
             );
           })}
         </ul>
-      )}
-
-      {hits.length === 0 && rawDebug && (
-        <pre className="mt-4 max-h-64 overflow-auto rounded border border-neutral-200 bg-neutral-50 p-3 text-xs dark:border-neutral-800 dark:bg-neutral-950">
-          {rawDebug}
-        </pre>
-      )}
+      ) : null}
     </section>
   );
 }

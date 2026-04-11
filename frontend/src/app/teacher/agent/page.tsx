@@ -5,14 +5,11 @@ export default function TeacherAgentPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
-          AI yordamchi
+          AI assistant
         </h1>
         <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-          Guruhni tanlang va savol bering. Iqtiboslar uchun{" "}
-          <code className="rounded bg-neutral-100 px-1 text-xs dark:bg-neutral-800">
-            Corpus
-          </code>{" "}
-          panelidan foydalaning.
+          Choose a class and ask a question. Use the materials panel to verify the exact textbook
+          passage the AI should cite.
         </p>
       </div>
       <AgentChatSession variant="teacher" />
