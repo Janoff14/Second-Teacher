@@ -6,12 +6,13 @@ import { useCallback, useEffect, useState } from "react";
 import { AgentChatSession } from "@/components/agent/AgentChatSession";
 import {
   createJoinCode,
+  listGroupStudents,
   listGroups,
   listJoinCodes,
   listSubjects,
   revokeJoinCode,
 } from "@/lib/api/academic";
-import type { Group, JoinCodeRecord, Subject } from "@/lib/api/academic";
+import type { Group, GroupStudent, JoinCodeRecord, Subject } from "@/lib/api/academic";
 import {
   createDraft,
   listDrafts,
@@ -65,6 +66,8 @@ export default function TeacherGroupWorkspacePage() {
 
   const [insights, setInsights] = useState<Insight[]>([]);
   const [insightLoading, setInsightLoading] = useState(false);
+  const [students, setStudents] = useState<GroupStudent[]>([]);
+  const [studentsLoading, setStudentsLoading] = useState(false);
   const [studentId, setStudentId] = useState("");
   const [riskJson, setRiskJson] = useState<string | null>(null);
   const [recomputeBusy, setRecomputeBusy] = useState(false);
@@ -142,9 +145,25 @@ export default function TeacherGroupWorkspacePage() {
     setInsights(unwrapInsightList(res.data));
   }, [groupId]);
 
+  const loadStudents = useCallback(async () => {
+    if (!groupId) return;
+    setStudentsLoading(true);
+    const res = await listGroupStudents(groupId);
+    setStudentsLoading(false);
+    if (!res.ok) {
+      setStudents([]);
+      return;
+    }
+    setStudents(Array.isArray(res.data) ? res.data : []);
+  }, [groupId]);
+
   useEffect(() => {
     if (group && tab === "analytics") void loadInsights();
   }, [group, tab, loadInsights]);
+
+  useEffect(() => {
+    if (group && tab === "analytics") void loadStudents();
+  }, [group, tab, loadStudents]);
 
   async function handleCreateJoinCode() {
     setJoinBusy(true);
@@ -521,6 +540,29 @@ export default function TeacherGroupWorkspacePage() {
             </ul>
             {insights.length === 0 && !insightLoading && (
               <p className="mt-2 text-sm text-neutral-500">Insight yo\u2018q.</p>
+            )}
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
+              Talabalar ro&apos;yxati
+            </h3>
+            {studentsLoading ? (
+              <p className="mt-2 text-sm text-neutral-500">Yuklanmoqda…</p>
+            ) : students.length === 0 ? (
+              <p className="mt-2 text-sm text-neutral-500">Bu guruhda talabalar topilmadi.</p>
+            ) : (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {students.map((s) => (
+                  <button
+                    key={s.studentId}
+                    type="button"
+                    onClick={() => setStudentId(s.studentId)}
+                    className="rounded border border-neutral-300 px-2 py-1 font-mono text-xs hover:bg-neutral-100 dark:border-neutral-600 dark:hover:bg-neutral-800"
+                  >
+                    {s.studentId}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
           <div>

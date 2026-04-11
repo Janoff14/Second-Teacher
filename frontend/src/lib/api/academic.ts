@@ -92,6 +92,11 @@ export type JoinCodeRecord = {
   revokedAt?: string | null;
 };
 
+export type GroupStudent = {
+  studentId: string;
+  enrolledAt: string;
+};
+
 export async function listSubjects() {
   return apiRequest<Subject[]>("/subjects", { method: "GET" });
 }
@@ -106,6 +111,10 @@ export async function createSubject(input: { name: string; code?: string }) {
 export async function listGroups(subjectId: string) {
   const q = new URLSearchParams({ subjectId });
   return apiRequest<Group[]>(`/groups?${q.toString()}`, { method: "GET" });
+}
+
+export async function listGroupStudents(groupId: string) {
+  return apiRequest<GroupStudent[]>(`/groups/${groupId}/students`, { method: "GET" });
 }
 
 export async function createGroup(input: { subjectId: string; name: string }) {

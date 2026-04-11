@@ -35,7 +35,7 @@ const envSchema = z.object({
    */
   SEED_DEMO_DATA: z.preprocess(
     (v) => v === true || v === "true" || v === "1" || v === "yes" || v === "YES",
-    z.boolean().default(false),
+    z.boolean().optional(),
   ),
 });
 
@@ -46,4 +46,11 @@ if (!parsed.success) {
   throw new Error(`Invalid environment configuration: ${fields}`);
 }
 
-export const env = parsed.data;
+const seedDemoDataDefault = parsed.data.NODE_ENV !== "production";
+const seedDemoData =
+  process.env.SEED_DEMO_DATA === undefined ? seedDemoDataDefault : (parsed.data.SEED_DEMO_DATA ?? false);
+
+export const env = {
+  ...parsed.data,
+  SEED_DEMO_DATA: seedDemoData,
+};

@@ -7,6 +7,7 @@ import {
   createGroup,
   createJoinCode,
   createSubject,
+  listEnrollmentsForGroup,
   listGroups,
   listSubjects,
   revokeJoinCode,
@@ -113,6 +114,30 @@ academicRouter.post(
 academicRouter.get("/groups", requireAuth, requireRole(["admin", "teacher"]), (_req, res) => {
   res.status(200).json({ data: listGroups() });
 });
+
+academicRouter.get(
+  "/groups/:groupId/students",
+  requireAuth,
+  requireRole(["admin", "teacher"]),
+  (req, res) => {
+    const groupId = req.params.groupId;
+    if (!groupId || Array.isArray(groupId)) {
+      throw new Error("Group id is required");
+    }
+    const actor = req.user!;
+    if (!canTeacherManageGroup(actor.userId, actor.role, groupId)) {
+      const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
+      err.statusCode = 403;
+      err.code = "FORBIDDEN";
+      throw err;
+    }
+    const students = listEnrollmentsForGroup(groupId).map((e) => ({
+      studentId: e.studentId,
+      enrolledAt: e.enrolledAt,
+    }));
+    res.status(200).json({ data: students });
+  },
+);
 
 const assignTeacherSchema = z.object({
   teacherId: z.string().min(1),
