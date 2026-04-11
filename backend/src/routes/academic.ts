@@ -8,11 +8,14 @@ import {
   createJoinCode,
   createSubject,
   listEnrollmentsForGroup,
+  listJoinCodesForGroup,
   listGroups,
   listSubjects,
   revokeJoinCode,
+  revokeJoinCodeById,
 } from "../domain/academicStore";
 import { appendAuditLog } from "../domain/auditStore";
+import { buildStudentAcademicScope } from "../domain/studentExperience";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 
@@ -45,6 +48,16 @@ academicRouter.post(
 
 academicRouter.get("/subjects", requireAuth, requireRole(["admin", "teacher"]), (_req, res) => {
   res.status(200).json({ data: listSubjects() });
+});
+
+academicRouter.get("/student/academic-scope", requireAuth, requireRole(["student"]), async (req, res, next) => {
+  try {
+    const user = req.user!;
+    const items = await buildStudentAcademicScope(user.userId);
+    res.status(200).json({ data: items });
+  } catch (e) {
+    next(e);
+  }
 });
 
 /**
@@ -111,8 +124,10 @@ academicRouter.post(
   },
 );
 
-academicRouter.get("/groups", requireAuth, requireRole(["admin", "teacher"]), (_req, res) => {
-  res.status(200).json({ data: listGroups() });
+academicRouter.get("/groups", requireAuth, requireRole(["admin", "teacher"]), (req, res) => {
+  const subjectId = typeof req.query.subjectId === "string" ? req.query.subjectId : undefined;
+  const groups = subjectId ? listGroups().filter((group) => group.subjectId === subjectId) : listGroups();
+  res.status(200).json({ data: groups });
 });
 
 academicRouter.get(
@@ -197,11 +212,33 @@ academicRouter.post(
     });
     res.status(201).json({
       data: {
+        id: code.id,
         code: code.code,
         groupId: code.groupId,
         expiresAt: code.expiresAt ?? null,
+        revokedAt: code.revokedAt ?? null,
       },
     });
+  },
+);
+
+academicRouter.get(
+  "/groups/:groupId/join-codes",
+  requireAuth,
+  requireRole(["admin", "teacher"]),
+  (req, res) => {
+    const groupId = req.params.groupId;
+    if (!groupId || Array.isArray(groupId)) {
+      throw new Error("Group id is required");
+    }
+    const actor = req.user!;
+    if (!canTeacherManageGroup(actor.userId, actor.role, groupId)) {
+      const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
+      err.statusCode = 403;
+      err.code = "FORBIDDEN";
+      throw err;
+    }
+    res.status(200).json({ data: listJoinCodesForGroup(groupId) });
   },
 );
 
@@ -221,5 +258,27 @@ academicRouter.post(
     }
     const revoked = revokeJoinCode(groupId, req.body.code as string);
     res.status(200).json({ data: { code: revoked.code, revokedAt: revoked.revokedAt } });
+  },
+);
+
+academicRouter.delete(
+  "/groups/:groupId/join-codes/:joinCodeId",
+  requireAuth,
+  requireRole(["admin", "teacher"]),
+  (req, res) => {
+    const groupId = req.params.groupId;
+    const joinCodeId = req.params.joinCodeId;
+    if (!groupId || Array.isArray(groupId) || !joinCodeId || Array.isArray(joinCodeId)) {
+      throw new Error("Group id and join code id are required");
+    }
+    const actor = req.user!;
+    if (!canTeacherManageGroup(actor.userId, actor.role, groupId)) {
+      const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
+      err.statusCode = 403;
+      err.code = "FORBIDDEN";
+      throw err;
+    }
+    const revoked = revokeJoinCodeById(groupId, joinCodeId);
+    res.status(200).json({ data: revoked });
   },
 );

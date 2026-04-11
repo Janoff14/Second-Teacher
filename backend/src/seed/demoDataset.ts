@@ -48,20 +48,20 @@ import { indexPublishedAssessmentVersion, ingestTextbook, resetRagStoreForTest }
 import { createUser, getUserByEmail } from "../domain/userStore";
 import { resetRateLimitForTest } from "../middleware/rateLimit";
 
-export const DEMO_SEED_SUBJECT_NAME = "Demo Sandbox [SEED]";
+export const DEMO_SEED_SUBJECT_NAME = "Physics Foundations_demo";
 /** Login for the roster demo; also seeded in `seedDefaultUsers` when present. */
-export const DEMO_SEED_TEACHER_EMAIL = "demo.seed.teacher@secondteacher.dev";
-export const DEMO_SEED_TEACHER_DISPLAY_NAME = "Seed Demo Teacher";
+export const DEMO_SEED_TEACHER_EMAIL = "kamila.saidova_demo@secondteacher.dev";
+export const DEMO_SEED_TEACHER_DISPLAY_NAME = "Kamila Saidova_demo";
 export const DEMO_STUDENT_PASSWORD = "DemoSeed2026!";
-/** Total synthetic students (emails `demo.seed.s001@…` … `s120@…`) when using default seed options. */
+/** Total synthetic students generated for the demo roster when using default seed options. */
 export const DEMO_STUDENT_COUNT = 120;
 
 /** Section (group) names; students are split evenly across these under {@link DEMO_SEED_TEACHER_EMAIL}. */
 export const DEMO_SEED_SECTION_NAMES = [
-  "Period A (SEED)",
-  "Period B (SEED)",
-  "Period C (SEED)",
-  "Period D (SEED)",
+  "Physics Cohort A_demo",
+  "Physics Cohort B_demo",
+  "Physics Cohort C_demo",
+  "Physics Cohort D_demo",
 ] as const;
 
 export const DEMO_SEED_SECTION_COUNT = DEMO_SEED_SECTION_NAMES.length;
@@ -74,6 +74,37 @@ export interface DemoAssessmentSpec {
   itemCount: number;
   stemPrefix: string;
 }
+
+const DEMO_FIRST_NAMES = [
+  "Amina",
+  "Dilnoza",
+  "Mohira",
+  "Sevara",
+  "Ziyoda",
+  "Maftuna",
+  "Nodira",
+  "Shahnoza",
+  "Madina",
+  "Feruza",
+  "Nigora",
+  "Laylo",
+  "Umida",
+  "Sitora",
+  "Aziza",
+] as const;
+
+const DEMO_LAST_NAMES = [
+  "Karimova",
+  "Rakhimova",
+  "Ismailova",
+  "Tursunova",
+  "Akhmedova",
+  "Usmanova",
+  "Kadirova",
+  "Yuldasheva",
+] as const;
+
+const DEMO_RESERVED_EMAILS = new Set([DEMO_SEED_TEACHER_EMAIL]);
 
 export type DemoProfile =
   | "at_risk"
@@ -88,29 +119,86 @@ export type DemoProfile =
 
 /** Published assessment lineup: multiple practices, quizzes, and unit/final exams for roster-scale UI testing. */
 export function buildDemoAssessmentSpecs(): DemoAssessmentSpec[] {
-  const out: DemoAssessmentSpec[] = [];
-  for (let i = 1; i <= 5; i++) {
-    out.push({
+  return [
+    {
       kind: "practice",
-      title: `Practice set ${i} [SEED]`,
+      title: "Practice: Motion and vectors_demo",
       itemCount: 5,
-      stemPrefix: `Practice ${i}`,
-    });
-  }
-  for (let i = 1; i <= 5; i++) {
-    out.push({
+      stemPrefix: "Motion and vectors practice",
+    },
+    {
+      kind: "practice",
+      title: "Practice: Velocity graphs_demo",
+      itemCount: 5,
+      stemPrefix: "Velocity graph practice",
+    },
+    {
+      kind: "practice",
+      title: "Practice: Forces and free body diagrams_demo",
+      itemCount: 5,
+      stemPrefix: "Forces practice",
+    },
+    {
+      kind: "practice",
+      title: "Practice: Energy transfer basics_demo",
+      itemCount: 5,
+      stemPrefix: "Energy transfer practice",
+    },
+    {
+      kind: "practice",
+      title: "Practice: Momentum review_demo",
+      itemCount: 5,
+      stemPrefix: "Momentum review practice",
+    },
+    {
       kind: "quiz",
-      title: `Quiz ${i} [SEED]`,
+      title: "Quiz: Kinematics checkpoint_demo",
       itemCount: 6,
-      stemPrefix: `Quiz ${i}`,
-    });
-  }
-  out.push(
-    { kind: "exam", title: "Unit test 1 [SEED]", itemCount: 8, stemPrefix: "Unit 1" },
-    { kind: "exam", title: "Unit test 2 [SEED]", itemCount: 8, stemPrefix: "Unit 2" },
-    { kind: "exam", title: "Final exam [SEED]", itemCount: 10, stemPrefix: "Final" },
-  );
-  return out;
+      stemPrefix: "Kinematics quiz",
+    },
+    {
+      kind: "quiz",
+      title: "Quiz: Newton's laws checkpoint_demo",
+      itemCount: 6,
+      stemPrefix: "Newton laws quiz",
+    },
+    {
+      kind: "quiz",
+      title: "Quiz: Work and energy checkpoint_demo",
+      itemCount: 6,
+      stemPrefix: "Work and energy quiz",
+    },
+    {
+      kind: "quiz",
+      title: "Quiz: Momentum and collisions_demo",
+      itemCount: 6,
+      stemPrefix: "Momentum and collisions quiz",
+    },
+    {
+      kind: "quiz",
+      title: "Quiz: Waves and sound checkpoint_demo",
+      itemCount: 6,
+      stemPrefix: "Waves and sound quiz",
+    },
+    {
+      kind: "exam",
+      title: "Test: Unit 1 mechanics_demo",
+      itemCount: 8,
+      stemPrefix: "Unit 1 mechanics test",
+    },
+    {
+      kind: "exam",
+      title: "Test: Unit 2 energy and momentum_demo",
+      itemCount: 8,
+      stemPrefix: "Unit 2 energy and momentum test",
+    },
+    {
+      kind: "exam",
+      title: "Exam: Semester physics final_demo",
+      itemCount: 10,
+      stemPrefix: "Semester final exam",
+    },
+  ];
 }
 
 export const DEMO_ASSESSMENT_SPECS: DemoAssessmentSpec[] = buildDemoAssessmentSpecs();
@@ -162,8 +250,26 @@ const PROFILE_CYCLE: DemoProfile[] = [
   "low_load",
 ];
 
+function slugifyIdentity(input: string): string {
+  return input.toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.+|\.+$/g, "");
+}
+
+function studentIdentity(index1Based: number): { email: string; displayName: string } {
+  let zeroBased = index1Based - 1;
+  while (true) {
+    const first = DEMO_FIRST_NAMES[zeroBased % DEMO_FIRST_NAMES.length]!;
+    const last = DEMO_LAST_NAMES[Math.floor(zeroBased / DEMO_FIRST_NAMES.length) % DEMO_LAST_NAMES.length]!;
+    const displayName = `${first} ${last}_demo`;
+    const email = `${slugifyIdentity(`${first}.${last}`)}_demo@secondteacher.dev`;
+    if (!DEMO_RESERVED_EMAILS.has(email)) {
+      return { email, displayName };
+    }
+    zeroBased += 1;
+  }
+}
+
 function studentEmail(index1Based: number): string {
-  return `demo.seed.s${String(index1Based).padStart(3, "0")}@secondteacher.dev`;
+  return studentIdentity(index1Based).email;
 }
 
 function profileForIndex(studentIndex: number): DemoProfile {
@@ -318,8 +424,8 @@ async function ensureAllStudents(count: number): Promise<string[]> {
     const slice = await Promise.all(
       Array.from({ length: end - start }, async (_, j) => {
         const i = start + j;
-        const email = studentEmail(i + 1);
-        return ensureStudent(email, `Seed Student ${String(i + 1).padStart(3, "0")}`);
+        const identity = studentIdentity(i + 1);
+        return ensureStudent(identity.email, identity.displayName);
       }),
     );
     for (let k = 0; k < slice.length; k++) {
@@ -452,13 +558,15 @@ export async function seedDemoDataset(options?: SeedDemoDatasetOptions): Promise
   try {
     await ingestTextbook({
       subjectId: subject.id,
-      title: "Demo textbook [SEED]",
+      title: "Physics Foundations Reader_demo",
       versionLabel: "seed-1",
       text:
-        "# Chapter 1: Introduction\n" +
-        "This seeded chapter supports RAG and reader demos. Energy and motion are core topics.\n\n" +
-        "# Chapter 2: Practice context\n" +
-        "Students review vectors before the cumulative exam. Use citations from this text in the agent chat.",
+        "# Chapter 1: Motion and vectors\n" +
+        "Motion describes how an object's position changes over time. Students compare distance, displacement, speed, and velocity before moving into graph interpretation.\n\n" +
+        "A velocity-time graph can reveal steady motion, acceleration, or a change in direction. When the line slopes upward, the object is accelerating in the positive direction.\n\n" +
+        "# Chapter 2: Forces and energy\n" +
+        "Newton's laws connect force, mass, and acceleration. Free-body diagrams help students isolate the forces acting on an object before deciding how it will move.\n\n" +
+        "Energy is transferred when work is done. Students should review kinetic energy, gravitational potential energy, and conservation of energy before the larger unit tests.",
       createdBy: teacher.id,
     });
   } catch (err) {
@@ -480,8 +588,8 @@ export async function seedDemoDataset(options?: SeedDemoDatasetOptions): Promise
       totalPublishedVersions: publishedVersionIds.length,
       byKind,
       teacher: DEMO_SEED_TEACHER_EMAIL,
-      password: DEMO_STUDENT_PASSWORD,
-      emailPattern: `demo.seed.s001@secondteacher.dev … demo.seed.s${String(studentCount).padStart(3, "0")}@secondteacher.dev`,
+        password: DEMO_STUDENT_PASSWORD,
+      emailPattern: `${studentIdentity(1).email} … ${studentIdentity(studentCount).email}`,
       profilesInCycle: PROFILE_CYCLE,
     },
     "demo_seed_complete",

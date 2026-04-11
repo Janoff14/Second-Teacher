@@ -87,6 +87,16 @@ export function getDraft(draftId: string): AssessmentDraft | undefined {
   return draftsById.get(draftId);
 }
 
+export function listDrafts(groupId?: string): AssessmentDraft[] {
+  const rows = [...draftsById.values()];
+  if (!groupId) {
+    return rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+  return rows
+    .filter((draft) => draft.groupId === groupId)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
 export function setDraftItems(
   draftId: string,
   items: Array<{ stem: string; options: Record<string, string>; correctKey: string }>,

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { canTeacherManageGroup, isStudentInGroup } from "../domain/academicStore";
+import { canTeacherManageGroup, getGroup, getSubject, isStudentInGroup } from "../domain/academicStore";
 import {
   listInsightsForStudent,
   listInsightsForTeacher,
@@ -108,6 +108,31 @@ insightsRouter.get("/notifications/me", requireAuth, (req, res) => {
   const user = req.user!;
   const limitRaw = typeof req.query.limit === "string" ? Number.parseInt(req.query.limit, 10) : 50;
   const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 100) : 50;
-  const data = listNotificationsForUser(user.userId, limit);
+  const data = listNotificationsForUser(user.userId, limit).map((notification) => {
+    const group = getGroup(notification.groupId);
+    const subject = group ? getSubject(group.subjectId) : undefined;
+    const insight =
+      user.role === "student"
+        ? listInsightsForStudent(user.userId, notification.groupId).find((item) => item.id === notification.insightId)
+        : listInsightsForTeacher(notification.groupId, { status: "all" }).find((item) => item.id === notification.insightId);
+    return {
+      id: notification.id,
+      type: "ai_risk_alert",
+      title:
+        insight?.title ??
+        (notification.riskLevel === "at_risk"
+          ? "AI alert: performance risk is rising"
+          : "AI alert: study attention needed"),
+      body:
+        insight?.factors.map((factor) => factor.message).join(" ") ??
+        "Second Teacher detected a learning pattern that needs attention before the next assessment.",
+      createdAt: notification.createdAt,
+      riskLevel: notification.riskLevel,
+      groupId: notification.groupId,
+      studentId: notification.studentId,
+      subjectName: subject?.name ?? null,
+      read: false,
+    };
+  });
   res.status(200).json({ data });
 });

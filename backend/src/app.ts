@@ -17,6 +17,7 @@ import { enrollmentRouter } from "./routes/enrollment";
 import { healthRouter } from "./routes/health";
 import { protectedRouter } from "./routes/protected";
 import { ragRouter } from "./routes/rag";
+import { studentRouter } from "./routes/student";
 import { usersRouter } from "./routes/users";
 
 export function createApp() {
@@ -50,6 +51,7 @@ export function createApp() {
   app.use(assessmentsRouter);
   app.use(insightsRouter);
   app.use(ragRouter);
+  app.use(studentRouter);
   app.use(agentRouter);
   app.use(auditRouter);
   app.use(protectedRouter);

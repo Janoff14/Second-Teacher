@@ -21,13 +21,9 @@ const teacherTabs: NavItem[] = [
 ];
 
 const studentTabs: NavItem[] = [
-  { href: "/student", label: "Dashboard" },
+  { href: "/student", label: "My subjects" },
   { href: "/join", label: "Join class" },
-  { href: "/student/corpus", label: "Corpus" },
-  { href: "/student/assessments", label: "Assessments" },
-  { href: "/student/insights", label: "Insights" },
-  { href: "/student/agent", label: "Agent" },
-  { href: "/notifications", label: "Notifications" },
+  { href: "/notifications", label: "AI alerts" },
 ];
 
 function isActive(pathname: string, href: string): boolean {
@@ -36,6 +32,9 @@ function isActive(pathname: string, href: string): boolean {
       return (
         pathname === "/teacher" || pathname.startsWith("/teacher/groups")
       );
+    }
+    if (href === "/student") {
+      return pathname === "/student" || pathname.startsWith("/student/subjects");
     }
     return pathname === href;
   }

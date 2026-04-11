@@ -512,6 +512,12 @@ export function getTextbookSourceById(textbookSourceId: string): TextbookSourceR
   return textbookSources.find((s) => s.id === textbookSourceId);
 }
 
+export function listTextbookSourcesForSubject(subjectId: string): TextbookSourceRecord[] {
+  return textbookSources
+    .filter((s) => s.subjectId === subjectId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
 export function getTextbookReaderDocument(textbookSourceId: string): TextbookReaderDocument | undefined {
   return textbookReaderDocuments.get(textbookSourceId);
 }

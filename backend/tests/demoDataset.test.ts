@@ -5,10 +5,11 @@ import { resetInsightsStoreForTest } from "../src/domain/insightsStore";
 import { resetRagStoreForTest } from "../src/domain/ragStore";
 import { resetAuditStoreForTest } from "../src/domain/auditStore";
 import { resetRateLimitForTest } from "../src/middleware/rateLimit";
-import { resetUsersForTest, seedDefaultUsers } from "../src/domain/userStore";
+import { listUsersByRole, resetUsersForTest, seedDefaultUsers } from "../src/domain/userStore";
 import {
   DEMO_ASSESSMENT_SPECS,
   DEMO_SEED_SECTION_COUNT,
+  DEMO_SEED_TEACHER_EMAIL,
   DEMO_STUDENT_COUNT,
   buildDemoAssessmentSpecs,
   demoAttemptDaysAgoForProfile,
@@ -72,7 +73,7 @@ describe("seedDemoDataset", () => {
 
   it("seeds reduced cohort quickly with four sections and a dedicated teacher", async () => {
     const s = await seedDemoDataset({ studentCount: 8 });
-    expect(s.teacherEmail).toBe("demo.seed.teacher@secondteacher.dev");
+    expect(s.teacherEmail).toBe("kamila.saidova_demo@secondteacher.dev");
     expect(s.groupIds.length).toBe(DEMO_SEED_SECTION_COUNT);
     expect(s.studentsPerSection.reduce((a, b) => a + b, 0)).toBe(8);
     expect(s.studentCount).toBe(8);
@@ -106,4 +107,12 @@ describe("seedDemoDataset", () => {
     const practiceVid = s.publishedVersionIds[0]!;
     expect(listAttemptsForVersion(practiceVid).length).toBeGreaterThanOrEqual(100);
   }, 180_000);
+
+  it("keeps the dedicated demo teacher out of the student roster", async () => {
+    await seedDemoDataset({ studentCount: 30 });
+    const students = await listUsersByRole("student");
+    const emails = students.map((student) => student.email);
+    expect(emails).not.toContain(DEMO_SEED_TEACHER_EMAIL);
+    expect(new Set(emails).size).toBe(emails.length);
+  }, 60_000);
 });

@@ -13,6 +13,38 @@ export type RagQueryBody = {
   topK?: number;
 };
 
+export type ReaderDocumentResponse = {
+  source: {
+    id: string;
+    title: string;
+    versionLabel: string;
+  };
+  chapters: Array<{
+    chapterNumber: number;
+    title: string;
+    startPage: number;
+    endPage: number;
+    paragraphIds: string[];
+  }>;
+  paragraphs: Array<{
+    id: string;
+    chapterNumber: number;
+    chapterTitle: string;
+    paragraphIndexInChapter: number;
+    pageNumber: number;
+    text: string;
+    sentences: string[];
+  }>;
+  focus: {
+    paragraphId: string;
+    chapterNumber: number;
+    chapterTitle: string;
+    pageNumber: number;
+    sentenceStart?: number;
+    sentenceEnd?: number;
+  } | null;
+};
+
 export async function ingestTextbook(body: TextbookIngestBody) {
   return apiRequest<unknown>("/rag/sources/textbooks", {
     method: "POST",
@@ -29,6 +61,23 @@ export async function queryCorpus(body: RagQueryBody) {
       ...(body.topK !== undefined ? { topK: body.topK } : {}),
     }),
   });
+}
+
+export async function getReaderDocument(params: {
+  textbookSourceId: string;
+  groupId: string;
+  paragraphId?: string;
+  sentenceStart?: number;
+  sentenceEnd?: number;
+}) {
+  const q = new URLSearchParams({ groupId: params.groupId });
+  if (params.paragraphId) q.set("paragraphId", params.paragraphId);
+  if (params.sentenceStart !== undefined) q.set("sentenceStart", String(params.sentenceStart));
+  if (params.sentenceEnd !== undefined) q.set("sentenceEnd", String(params.sentenceEnd));
+  return apiRequest<ReaderDocumentResponse>(
+    `/reader/textbooks/${params.textbookSourceId}?${q.toString()}`,
+    { method: "GET" },
+  );
 }
 
 /** Normalize various API shapes to a list of hit objects for rendering. */

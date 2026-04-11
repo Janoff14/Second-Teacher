@@ -10,6 +10,9 @@ export type AppNotification = {
   read?: boolean | null;
   createdAt?: string | null;
   type?: string | null;
+  riskLevel?: string | null;
+  groupId?: string | null;
+  subjectName?: string | null;
 };
 
 export function unwrapNotificationList(data: unknown): AppNotification[] {

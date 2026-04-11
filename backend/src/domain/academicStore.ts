@@ -20,6 +20,7 @@ export interface TeacherAssignmentRecord {
 }
 
 export interface JoinCodeRecord {
+  id: string;
   groupId: string;
   code: string;
   createdBy: string;
@@ -41,6 +42,7 @@ const enrollments = new Map<string, EnrollmentRecord[]>();
 
 let subjectCounter = 1;
 let groupCounter = 1;
+let joinCodeCounter = 1;
 
 export function createSubject(name: string, createdBy: string): SubjectRecord {
   const record: SubjectRecord = {
@@ -54,6 +56,10 @@ export function createSubject(name: string, createdBy: string): SubjectRecord {
 
 export function listSubjects(): SubjectRecord[] {
   return [...subjects.values()];
+}
+
+export function getSubject(subjectId: string): SubjectRecord | undefined {
+  return subjects.get(subjectId);
 }
 
 export function createGroup(subjectId: string, name: string, createdBy: string): GroupRecord {
@@ -111,6 +117,7 @@ export function createJoinCode(groupId: string, createdBy: string, ttlHours?: nu
   }
 
   const record: JoinCodeRecord = {
+    id: `jcd_${joinCodeCounter++}`,
     groupId,
     code: generateJoinCode(),
     createdBy,
@@ -128,6 +135,23 @@ export function createJoinCode(groupId: string, createdBy: string, ttlHours?: nu
 export function revokeJoinCode(groupId: string, code: string): JoinCodeRecord {
   const existing = joinCodes.get(groupId) ?? [];
   const found = existing.find((item) => item.code === code);
+  if (!found) {
+    const err = new Error("Join code not found") as Error & { statusCode?: number; code?: string };
+    err.statusCode = 404;
+    err.code = "JOIN_CODE_NOT_FOUND";
+    throw err;
+  }
+  found.revokedAt = new Date().toISOString();
+  return found;
+}
+
+export function listJoinCodesForGroup(groupId: string): JoinCodeRecord[] {
+  return [...(joinCodes.get(groupId) ?? [])];
+}
+
+export function revokeJoinCodeById(groupId: string, joinCodeId: string): JoinCodeRecord {
+  const existing = joinCodes.get(groupId) ?? [];
+  const found = existing.find((item) => item.id === joinCodeId);
   if (!found) {
     const err = new Error("Join code not found") as Error & { statusCode?: number; code?: string };
     err.statusCode = 404;
@@ -276,4 +300,5 @@ export function resetAcademicStoreForTest(): void {
   enrollments.clear();
   subjectCounter = 1;
   groupCounter = 1;
+  joinCodeCounter = 1;
 }

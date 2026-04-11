@@ -116,6 +116,7 @@ Tasks are ordered for dependency safety. **Phase 1b is blocking** for any “AI 
 | **J4.1** | Teacher chat: `POST /agent/teacher/chat` with `message`, `groupId`. |
 | **J4.2** | Student chat: `POST /agent/student/chat`. |
 | **J4.3** | Inline links from chat to **WF-CORPUS-SEARCH** hits where the API returns citation hooks (or side-by-side search panel). |
+| **J4.4** | Reader mode: open `/reader/textbooks/:textbookSourceId?groupId=...` and consume `citation.textbookLocation` + `citation.highlightText` from `/rag/query` to jump/highlight paragraph-sentence ranges. |
 
 ### Phase 5 — Polish
 

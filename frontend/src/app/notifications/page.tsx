@@ -1,5 +1,8 @@
 "use client";
 
+"use client";
+
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   listMyNotifications,
@@ -48,7 +51,7 @@ export default function NotificationsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
-          Notifications
+          AI alerts
         </h1>
         <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
           <code className="rounded bg-neutral-100 px-1 dark:bg-neutral-800">
@@ -104,7 +107,7 @@ export default function NotificationsPage() {
           {items.map((n) => (
             <li
               key={n.id}
-              className="rounded-md border border-neutral-200 px-3 py-3 dark:border-neutral-800"
+              className="rounded-[1.75rem] border border-neutral-200 bg-white px-4 py-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <p className="font-mono text-xs text-neutral-500">{n.id}</p>
@@ -122,6 +125,11 @@ export default function NotificationsPage() {
                   {n.type}
                 </p>
               )}
+              {n.subjectName && (
+                <p className="mt-2 text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                  {n.subjectName}
+                </p>
+              )}
               {(n.title || n.message || n.body || n.summary) && (
                 <p className="mt-2 text-sm text-neutral-800 dark:text-neutral-200">
                   {n.title && <strong>{n.title}</strong>}
@@ -132,6 +140,16 @@ export default function NotificationsPage() {
                   )}
                 </p>
               )}
+              {n.groupId ? (
+                <div className="mt-3">
+                  <Link
+                    href={`/student/subjects/${n.groupId}`}
+                    className="text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+                  >
+                    Open subject workspace
+                  </Link>
+                </div>
+              ) : null}
               {n.read === false && (
                 <span className="mt-2 inline-block rounded bg-blue-100 px-2 py-0.5 text-xs text-blue-800 dark:bg-blue-950/60 dark:text-blue-200">
                   Unread

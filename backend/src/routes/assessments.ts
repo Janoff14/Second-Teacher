@@ -5,6 +5,7 @@ import {
   createDraft,
   getDraft,
   getVersion,
+  listDrafts,
   listAttemptsForStudent,
   listPublishedVersionsForGroup,
   publishDraft,
@@ -22,7 +23,7 @@ export const assessmentsRouter = Router();
 
 const createDraftSchema = z.object({
   groupId: z.string().min(1),
-  title: z.string().min(1),
+  title: z.string().min(1).optional(),
 });
 
 assessmentsRouter.post(
@@ -33,20 +34,40 @@ assessmentsRouter.post(
   (req, res, next) => {
     try {
       const user = req.user!;
-      const { groupId, title } = req.body as { groupId: string; title: string };
+      const { groupId, title } = req.body as { groupId: string; title?: string };
       if (!canTeacherManageGroup(user.userId, user.role, groupId)) {
         const err = new Error("Forbidden for this group") as Error & { statusCode?: number; code?: string };
         err.statusCode = 403;
         err.code = "FORBIDDEN";
         throw err;
       }
-      const draft = createDraft(groupId, title, user.userId);
+      const draft = createDraft(groupId, title?.trim() || "Untitled assessment", user.userId);
       res.status(201).json({ data: draft });
     } catch (e) {
       next(e);
     }
   },
 );
+
+assessmentsRouter.get("/assessments/drafts", requireAuth, requireRole(["admin", "teacher"]), (req, res, next) => {
+  try {
+    const user = req.user!;
+    const groupId = typeof req.query.groupId === "string" ? req.query.groupId : undefined;
+    if (groupId && !canTeacherManageGroup(user.userId, user.role, groupId)) {
+      const err = new Error("Forbidden for this group") as Error & { statusCode?: number; code?: string };
+      err.statusCode = 403;
+      err.code = "FORBIDDEN";
+      throw err;
+    }
+    let drafts = listDrafts(groupId);
+    if (user.role === "teacher" && !groupId) {
+      drafts = drafts.filter((draft) => canTeacherManageGroup(user.userId, user.role, draft.groupId));
+    }
+    res.status(200).json({ data: drafts });
+  } catch (e) {
+    next(e);
+  }
+});
 
 assessmentsRouter.get("/assessments/drafts/:draftId", requireAuth, requireRole(["admin", "teacher"]), (req, res, next) => {
   try {
@@ -119,11 +140,21 @@ assessmentsRouter.put(
   },
 );
 
-const publishSchema = z.object({
-  windowOpensAtUtc: z.string().min(1),
-  windowClosesAtUtc: z.string().min(1),
-  windowTimezone: z.string().min(1),
-});
+const publishSchema = z
+  .object({
+    windowOpensAtUtc: z.string().min(1).optional(),
+    windowClosesAtUtc: z.string().min(1).optional(),
+    windowTimezone: z.string().min(1).optional(),
+    opensAt: z.string().min(1).optional(),
+    closesAt: z.string().min(1).optional(),
+    groupId: z.string().min(1).optional(),
+  })
+  .refine(
+    (body) =>
+      (body.windowOpensAtUtc && body.windowClosesAtUtc) ||
+      (body.opensAt && body.closesAt),
+    "Schedule window is required",
+  );
 
 assessmentsRouter.post(
   "/assessments/drafts/:draftId/publish",
@@ -151,9 +182,9 @@ assessmentsRouter.post(
         throw err;
       }
       const version = publishDraft(draftId, user.userId, {
-        windowOpensAtUtc: req.body.windowOpensAtUtc as string,
-        windowClosesAtUtc: req.body.windowClosesAtUtc as string,
-        windowTimezone: req.body.windowTimezone as string,
+        windowOpensAtUtc: (req.body.windowOpensAtUtc as string | undefined) ?? (req.body.opensAt as string),
+        windowClosesAtUtc: (req.body.windowClosesAtUtc as string | undefined) ?? (req.body.closesAt as string),
+        windowTimezone: (req.body.windowTimezone as string | undefined) ?? "UTC",
       });
       const group = getGroup(version.groupId);
       if (group) {
@@ -170,6 +201,47 @@ assessmentsRouter.post(
         meta: { draftId, itemCount: version.items.length },
       });
       res.status(201).json({ data: version });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+assessmentsRouter.get(
+  "/assessments/attempts/me",
+  requireAuth,
+  requireRole(["student"]),
+  (req, res, next) => {
+    try {
+      const user = req.user!;
+      const groupId = typeof req.query.groupId === "string" ? req.query.groupId : undefined;
+      if (!groupId) {
+        const err = new Error("groupId is required") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 400;
+        err.code = "VALIDATION_ERROR";
+        throw err;
+      }
+      if (!isStudentInGroup(user.userId, groupId)) {
+        const err = new Error("Forbidden for this group") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 403;
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+      const versions = listPublishedVersionsForGroup(groupId);
+      const data = versions.flatMap((version) =>
+        listAttemptsForStudent(version.id, user.userId).map((attempt) => ({
+          id: attempt.id,
+          publishedAssessmentId: version.id,
+          title: version.title,
+          submittedAt: attempt.submittedAt,
+          score: attempt.totalScore,
+          maxScore: attempt.maxScore,
+          scorePct: attempt.maxScore > 0 ? Math.round((attempt.totalScore / attempt.maxScore) * 1000) / 10 : 0,
+          assessmentType: version.title,
+        })),
+      );
+      data.sort((a, b) => Date.parse(b.submittedAt) - Date.parse(a.submittedAt));
+      res.status(200).json({ data });
     } catch (e) {
       next(e);
     }
