@@ -182,9 +182,16 @@ export async function putDraftItems(
   draftId: string,
   items: DraftItemInput[] | AssessmentItem[],
 ) {
+  const payload = items.map((item) => ({
+    stem: item.stem,
+    correctKey: item.correctKey,
+    options: Array.isArray(item.options)
+      ? Object.fromEntries(item.options.map((o) => [o.key, o.label]))
+      : item.options,
+  }));
   return apiRequest<AssessmentDraft>(`/assessments/drafts/${draftId}/items`, {
     method: "PUT",
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ items: payload }),
   });
 }
 

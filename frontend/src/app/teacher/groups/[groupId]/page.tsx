@@ -29,6 +29,7 @@ import {
   unwrapInsightList,
   type Insight,
 } from "@/lib/api/insights";
+import { ResultsCharts } from "@/components/teacher/ResultsCharts";
 
 type TabId = "students" | "results" | "tests";
 
@@ -100,9 +101,23 @@ function riskLabel(level: GroupStudent["riskLevel"]) {
   }
 }
 
-function insightSeverityLabel(value?: string | null) {
+function insightSeverityLabel(severity?: string | null, riskLevel?: string | null) {
+  const value = riskLevel || severity;
   if (!value) return "AI note";
   return value.replace(/_/g, " ");
+}
+
+function insightBadgeClasses(riskLevel?: string | null) {
+  switch (riskLevel) {
+    case "at_risk":
+      return "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200";
+    case "watchlist":
+      return "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200";
+    case "stable":
+      return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200";
+    default:
+      return "bg-neutral-200 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200";
+  }
 }
 
 function SummaryCard({
@@ -254,7 +269,7 @@ export default function TeacherGroupWorkspacePage() {
       return;
     }
     if (tab === "results") {
-      void Promise.all([loadResults(), loadInsights()]);
+      void Promise.all([loadResults(), loadInsights(), loadStudents()]);
       return;
     }
     if (tab === "tests") {
@@ -287,6 +302,14 @@ export default function TeacherGroupWorkspacePage() {
         return new Date(right.submittedAt).getTime() - new Date(left.submittedAt).getTime();
       });
   }, [resultsSummary]);
+
+  const studentNameMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of students) {
+      if (s.displayName) map.set(s.studentId, s.displayName);
+    }
+    return map;
+  }, [students]);
 
   const topRiskStudents = useMemo(() => {
     return [...students]
@@ -621,6 +644,10 @@ export default function TeacherGroupWorkspacePage() {
             />
           </div>
 
+          {resultsSummary ? (
+            <ResultsCharts summary={resultsSummary} insights={insights} />
+          ) : null}
+
           <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
             <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
               <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
@@ -638,7 +665,7 @@ export default function TeacherGroupWorkspacePage() {
                 </div>
               ) : (
                 <ul className="mt-4 space-y-3">
-                  {recentResults.slice(0, 10).map((result) => (
+                  {recentResults.slice(0, 25).map((result) => (
                     <li
                       key={result.attemptId}
                       className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/40"
@@ -699,8 +726,8 @@ export default function TeacherGroupWorkspacePage() {
                         <p className="font-medium text-neutral-900 dark:text-neutral-100">
                           {insight.title || "AI note"}
                         </p>
-                        <span className="rounded-full bg-neutral-200 px-2.5 py-1 text-xs font-medium text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200">
-                          {insightSeverityLabel(insight.severity)}
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium capitalize ${insightBadgeClasses(insight.riskLevel)}`}>
+                          {insightSeverityLabel(insight.severity, insight.riskLevel)}
                         </span>
                       </div>
                       <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-neutral-700 dark:text-neutral-300">
@@ -708,7 +735,7 @@ export default function TeacherGroupWorkspacePage() {
                       </p>
                       {insight.studentId ? (
                         <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
-                          Student ID: {insight.studentId}
+                          Student: {studentNameMap.get(insight.studentId) || insight.studentId}
                         </p>
                       ) : null}
                       <div className="mt-3 flex flex-wrap gap-3 text-sm">

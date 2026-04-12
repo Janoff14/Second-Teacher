@@ -18,9 +18,15 @@ function newBlankItem(): DraftItemInput {
 function toInput(
   item: AssessmentItem | DraftItemInput,
 ): DraftItemInput {
+  const rawOpts = item.options as
+    | { key: string; label: string }[]
+    | Record<string, string>;
+  const options = Array.isArray(rawOpts)
+    ? rawOpts.map((o) => ({ ...o }))
+    : Object.entries(rawOpts).map(([key, label]) => ({ key, label }));
   return {
     stem: item.stem,
-    options: item.options.map((o) => ({ ...o })),
+    options,
     correctKey: item.correctKey,
   };
 }

@@ -17,6 +17,12 @@ function ErrorBox({ message }: { message: string | null }) {
   );
 }
 
+type TextbookUploadResult = {
+  source: TextbookSource;
+  chunksCreated: number;
+  extractedCharacters: number;
+};
+
 type TextbookIngestFormProps = {
   initialSubjectId?: string;
   fixedSubjectId?: string;
@@ -42,6 +48,7 @@ export function TextbookIngestForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [uploadResult, setUploadResult] = useState<TextbookUploadResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const subjectLocked = Boolean(fixedSubjectId?.trim());
@@ -89,6 +96,7 @@ export function TextbookIngestForm({
     setLoading(true);
     setError(null);
     setSuccess(null);
+    setUploadResult(null);
 
     const res = await uploadTextbookFile({
       subjectId: subjectId.trim(),
@@ -103,12 +111,24 @@ export function TextbookIngestForm({
       return;
     }
 
-    const uploadedSource = res.data?.source;
+    const data = res.data;
+    const uploadedSource = data?.source;
     setSuccess(
       uploadedSource
         ? `${uploadedSource.title} was uploaded and prepared for AI search automatically.`
         : "Textbook uploaded and prepared for AI search automatically.",
     );
+    if (
+      data?.source &&
+      typeof data.chunksCreated === "number" &&
+      typeof data.extractedCharacters === "number"
+    ) {
+      setUploadResult({
+        source: data.source,
+        chunksCreated: data.chunksCreated,
+        extractedCharacters: data.extractedCharacters,
+      });
+    }
     setFile(null);
     setTitle("");
     setVersionLabel(inferDefaultVersionLabel());
@@ -130,9 +150,45 @@ export function TextbookIngestForm({
 
       <ErrorBox message={error} />
       {success ? (
-        <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900 dark:border-green-900/40 dark:bg-green-950/30 dark:text-green-100">
-          {success}
-        </p>
+        <div className="mt-3 space-y-3">
+          <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900 dark:border-green-900/40 dark:bg-green-950/30 dark:text-green-100">
+            {success}
+          </p>
+          {uploadResult ? (
+            <div
+              className="rounded-xl border border-green-200/80 bg-gradient-to-b from-green-50/90 to-white p-4 shadow-sm dark:border-green-900/45 dark:from-green-950/35 dark:to-neutral-950/80 dark:shadow-none"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center rounded-full border border-green-300 bg-green-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-green-900 dark:border-green-700/60 dark:bg-green-900/50 dark:text-green-50">
+                  Ready for AI search
+                </span>
+              </div>
+              <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-neutral-200/80 bg-white/60 px-3 py-2.5 dark:border-neutral-700/80 dark:bg-neutral-900/50">
+                  <dt className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                    Chunks indexed
+                  </dt>
+                  <dd className="mt-1 text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-50">
+                    {uploadResult.chunksCreated.toLocaleString()}
+                  </dd>
+                </div>
+                <div className="rounded-lg border border-neutral-200/80 bg-white/60 px-3 py-2.5 dark:border-neutral-700/80 dark:bg-neutral-900/50">
+                  <dt className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                    Characters extracted
+                  </dt>
+                  <dd className="mt-1 text-lg font-semibold tabular-nums text-neutral-900 dark:text-neutral-50">
+                    {uploadResult.extractedCharacters.toLocaleString()}
+                  </dd>
+                </div>
+              </dl>
+              <p className="mt-3 text-sm text-neutral-600 dark:text-neutral-400">
+                Students can now search this material in AI-assisted study tools.
+              </p>
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-4">

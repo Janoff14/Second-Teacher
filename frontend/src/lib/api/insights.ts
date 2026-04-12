@@ -7,6 +7,7 @@ export type Insight = {
   body?: string | null;
   summary?: string | null;
   severity?: string | null;
+  riskLevel?: string | null;
   studentId?: string | null;
   groupId?: string | null;
   status?: string | null;
