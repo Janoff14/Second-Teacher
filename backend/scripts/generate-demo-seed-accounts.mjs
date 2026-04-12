@@ -15,39 +15,58 @@ const pwd = "DemoSeed2026!";
 const teacherEmail = "kamila.saidova_demo@secondteacher.dev";
 const teacherName = "Kamila Saidova_demo";
 const sectionNames = [
-  "Physics Cohort A_demo",
-  "Physics Cohort B_demo",
-  "Physics Cohort C_demo",
-  "Physics Cohort D_demo",
+  "Physics 101 — Spring 2026",
 ];
-const studentCount = 120;
+const studentCount = 30;
 const sectionCount = sectionNames.length;
 const firstNames = [
-  "Amina",
-  "Dilnoza",
-  "Mohira",
-  "Sevara",
-  "Ziyoda",
-  "Maftuna",
-  "Nodira",
-  "Shahnoza",
-  "Madina",
-  "Feruza",
-  "Nigora",
-  "Laylo",
-  "Umida",
-  "Sitora",
-  "Aziza",
+  "Aisha",
+  "Brian",
+  "Carmen",
+  "David",
+  "Elena",
+  "Fatima",
+  "Gabriel",
+  "Hannah",
+  "Ivan",
+  "Jasmine",
+  "Kevin",
+  "Lila",
+  "Marcus",
+  "Nadia",
+  "Omar",
+  "Priya",
+  "Quinn",
+  "Rosa",
+  "Samuel",
+  "Tanya",
+  "Umar",
+  "Valentina",
+  "William",
+  "Xiomara",
+  "Yusuf",
+  "Zara",
+  "Andre",
+  "Bianca",
+  "Carlos",
+  "Diana",
 ];
 const lastNames = [
-  "Karimova",
-  "Rakhimova",
-  "Ismailova",
-  "Tursunova",
-  "Akhmedova",
-  "Usmanova",
-  "Kadirova",
-  "Yuldasheva",
+  "Martinez",
+  "Chen",
+  "Okafor",
+  "Petrov",
+  "Nguyen",
+  "Johansson",
+  "Al-Rashid",
+  "Tanaka",
+  "Williams",
+  "Kumar",
+  "Fernandez",
+  "Kim",
+  "Abadi",
+  "O'Brien",
+  "Volkov",
 ];
 const reservedEmails = new Set([teacherEmail]);
 
@@ -76,7 +95,7 @@ function studentIdentity(index1Based) {
   let zeroBased = index1Based - 1;
   while (true) {
     const first = firstNames[zeroBased % firstNames.length];
-    const last = lastNames[Math.floor(zeroBased / firstNames.length) % lastNames.length];
+    const last = lastNames[zeroBased % lastNames.length];
     const displayName = `${first} ${last}_demo`;
     const email = `${slugifyIdentity(`${first}.${last}`)}_demo@secondteacher.dev`;
     if (!reservedEmails.has(email)) {

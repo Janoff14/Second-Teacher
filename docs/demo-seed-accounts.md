@@ -9,123 +9,33 @@ Credentials for the synthetic roster created when `SEED_DEMO_DATA=true` (see `ba
 | Email | Password | Display name | Section |
 |-------|----------|--------------|---------|
 | kamila.saidova_demo@secondteacher.dev | `DemoSeed2026!` | Kamila Saidova_demo | *(teacher — owns all sections)* |
-| amina.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Amina Karimova_demo | Physics Cohort A_demo |
-| dilnoza.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Dilnoza Karimova_demo | Physics Cohort A_demo |
-| mohira.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Mohira Karimova_demo | Physics Cohort A_demo |
-| sevara.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Sevara Karimova_demo | Physics Cohort A_demo |
-| ziyoda.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Ziyoda Karimova_demo | Physics Cohort A_demo |
-| maftuna.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Maftuna Karimova_demo | Physics Cohort A_demo |
-| nodira.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Nodira Karimova_demo | Physics Cohort A_demo |
-| shahnoza.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Shahnoza Karimova_demo | Physics Cohort A_demo |
-| madina.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Madina Karimova_demo | Physics Cohort A_demo |
-| feruza.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Feruza Karimova_demo | Physics Cohort A_demo |
-| nigora.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Nigora Karimova_demo | Physics Cohort A_demo |
-| laylo.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Laylo Karimova_demo | Physics Cohort A_demo |
-| umida.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Umida Karimova_demo | Physics Cohort A_demo |
-| sitora.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Sitora Karimova_demo | Physics Cohort A_demo |
-| aziza.karimova_demo@secondteacher.dev | `DemoSeed2026!` | Aziza Karimova_demo | Physics Cohort A_demo |
-| amina.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Amina Rakhimova_demo | Physics Cohort A_demo |
-| dilnoza.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Dilnoza Rakhimova_demo | Physics Cohort A_demo |
-| mohira.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Mohira Rakhimova_demo | Physics Cohort A_demo |
-| sevara.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Sevara Rakhimova_demo | Physics Cohort A_demo |
-| ziyoda.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Ziyoda Rakhimova_demo | Physics Cohort A_demo |
-| maftuna.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Maftuna Rakhimova_demo | Physics Cohort A_demo |
-| nodira.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Nodira Rakhimova_demo | Physics Cohort A_demo |
-| shahnoza.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Shahnoza Rakhimova_demo | Physics Cohort A_demo |
-| madina.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Madina Rakhimova_demo | Physics Cohort A_demo |
-| feruza.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Feruza Rakhimova_demo | Physics Cohort A_demo |
-| nigora.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Nigora Rakhimova_demo | Physics Cohort A_demo |
-| laylo.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Laylo Rakhimova_demo | Physics Cohort A_demo |
-| umida.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Umida Rakhimova_demo | Physics Cohort A_demo |
-| sitora.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Sitora Rakhimova_demo | Physics Cohort A_demo |
-| aziza.rakhimova_demo@secondteacher.dev | `DemoSeed2026!` | Aziza Rakhimova_demo | Physics Cohort A_demo |
-| amina.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Amina Ismailova_demo | Physics Cohort B_demo |
-| dilnoza.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Dilnoza Ismailova_demo | Physics Cohort B_demo |
-| mohira.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Mohira Ismailova_demo | Physics Cohort B_demo |
-| sevara.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Sevara Ismailova_demo | Physics Cohort B_demo |
-| ziyoda.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Ziyoda Ismailova_demo | Physics Cohort B_demo |
-| maftuna.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Maftuna Ismailova_demo | Physics Cohort B_demo |
-| nodira.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Nodira Ismailova_demo | Physics Cohort B_demo |
-| shahnoza.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Shahnoza Ismailova_demo | Physics Cohort B_demo |
-| madina.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Madina Ismailova_demo | Physics Cohort B_demo |
-| feruza.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Feruza Ismailova_demo | Physics Cohort B_demo |
-| nigora.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Nigora Ismailova_demo | Physics Cohort B_demo |
-| laylo.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Laylo Ismailova_demo | Physics Cohort B_demo |
-| umida.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Umida Ismailova_demo | Physics Cohort B_demo |
-| sitora.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Sitora Ismailova_demo | Physics Cohort B_demo |
-| aziza.ismailova_demo@secondteacher.dev | `DemoSeed2026!` | Aziza Ismailova_demo | Physics Cohort B_demo |
-| amina.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Amina Tursunova_demo | Physics Cohort B_demo |
-| dilnoza.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Dilnoza Tursunova_demo | Physics Cohort B_demo |
-| mohira.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Mohira Tursunova_demo | Physics Cohort B_demo |
-| sevara.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Sevara Tursunova_demo | Physics Cohort B_demo |
-| ziyoda.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Ziyoda Tursunova_demo | Physics Cohort B_demo |
-| maftuna.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Maftuna Tursunova_demo | Physics Cohort B_demo |
-| nodira.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Nodira Tursunova_demo | Physics Cohort B_demo |
-| shahnoza.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Shahnoza Tursunova_demo | Physics Cohort B_demo |
-| madina.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Madina Tursunova_demo | Physics Cohort B_demo |
-| feruza.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Feruza Tursunova_demo | Physics Cohort B_demo |
-| nigora.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Nigora Tursunova_demo | Physics Cohort B_demo |
-| laylo.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Laylo Tursunova_demo | Physics Cohort B_demo |
-| umida.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Umida Tursunova_demo | Physics Cohort B_demo |
-| sitora.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Sitora Tursunova_demo | Physics Cohort B_demo |
-| aziza.tursunova_demo@secondteacher.dev | `DemoSeed2026!` | Aziza Tursunova_demo | Physics Cohort B_demo |
-| amina.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Amina Akhmedova_demo | Physics Cohort C_demo |
-| dilnoza.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Dilnoza Akhmedova_demo | Physics Cohort C_demo |
-| mohira.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Mohira Akhmedova_demo | Physics Cohort C_demo |
-| sevara.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Sevara Akhmedova_demo | Physics Cohort C_demo |
-| ziyoda.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Ziyoda Akhmedova_demo | Physics Cohort C_demo |
-| maftuna.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Maftuna Akhmedova_demo | Physics Cohort C_demo |
-| nodira.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Nodira Akhmedova_demo | Physics Cohort C_demo |
-| shahnoza.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Shahnoza Akhmedova_demo | Physics Cohort C_demo |
-| madina.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Madina Akhmedova_demo | Physics Cohort C_demo |
-| feruza.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Feruza Akhmedova_demo | Physics Cohort C_demo |
-| nigora.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Nigora Akhmedova_demo | Physics Cohort C_demo |
-| laylo.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Laylo Akhmedova_demo | Physics Cohort C_demo |
-| umida.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Umida Akhmedova_demo | Physics Cohort C_demo |
-| sitora.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Sitora Akhmedova_demo | Physics Cohort C_demo |
-| aziza.akhmedova_demo@secondteacher.dev | `DemoSeed2026!` | Aziza Akhmedova_demo | Physics Cohort C_demo |
-| amina.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Amina Usmanova_demo | Physics Cohort C_demo |
-| dilnoza.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Dilnoza Usmanova_demo | Physics Cohort C_demo |
-| mohira.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Mohira Usmanova_demo | Physics Cohort C_demo |
-| sevara.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Sevara Usmanova_demo | Physics Cohort C_demo |
-| ziyoda.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Ziyoda Usmanova_demo | Physics Cohort C_demo |
-| maftuna.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Maftuna Usmanova_demo | Physics Cohort C_demo |
-| nodira.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Nodira Usmanova_demo | Physics Cohort C_demo |
-| shahnoza.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Shahnoza Usmanova_demo | Physics Cohort C_demo |
-| madina.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Madina Usmanova_demo | Physics Cohort C_demo |
-| feruza.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Feruza Usmanova_demo | Physics Cohort C_demo |
-| nigora.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Nigora Usmanova_demo | Physics Cohort C_demo |
-| laylo.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Laylo Usmanova_demo | Physics Cohort C_demo |
-| umida.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Umida Usmanova_demo | Physics Cohort C_demo |
-| sitora.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Sitora Usmanova_demo | Physics Cohort C_demo |
-| aziza.usmanova_demo@secondteacher.dev | `DemoSeed2026!` | Aziza Usmanova_demo | Physics Cohort C_demo |
-| amina.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Amina Kadirova_demo | Physics Cohort D_demo |
-| dilnoza.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Dilnoza Kadirova_demo | Physics Cohort D_demo |
-| mohira.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Mohira Kadirova_demo | Physics Cohort D_demo |
-| sevara.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Sevara Kadirova_demo | Physics Cohort D_demo |
-| ziyoda.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Ziyoda Kadirova_demo | Physics Cohort D_demo |
-| maftuna.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Maftuna Kadirova_demo | Physics Cohort D_demo |
-| nodira.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Nodira Kadirova_demo | Physics Cohort D_demo |
-| shahnoza.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Shahnoza Kadirova_demo | Physics Cohort D_demo |
-| madina.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Madina Kadirova_demo | Physics Cohort D_demo |
-| feruza.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Feruza Kadirova_demo | Physics Cohort D_demo |
-| nigora.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Nigora Kadirova_demo | Physics Cohort D_demo |
-| laylo.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Laylo Kadirova_demo | Physics Cohort D_demo |
-| umida.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Umida Kadirova_demo | Physics Cohort D_demo |
-| sitora.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Sitora Kadirova_demo | Physics Cohort D_demo |
-| aziza.kadirova_demo@secondteacher.dev | `DemoSeed2026!` | Aziza Kadirova_demo | Physics Cohort D_demo |
-| amina.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Amina Yuldasheva_demo | Physics Cohort D_demo |
-| dilnoza.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Dilnoza Yuldasheva_demo | Physics Cohort D_demo |
-| mohira.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Mohira Yuldasheva_demo | Physics Cohort D_demo |
-| sevara.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Sevara Yuldasheva_demo | Physics Cohort D_demo |
-| ziyoda.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Ziyoda Yuldasheva_demo | Physics Cohort D_demo |
-| maftuna.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Maftuna Yuldasheva_demo | Physics Cohort D_demo |
-| nodira.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Nodira Yuldasheva_demo | Physics Cohort D_demo |
-| shahnoza.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Shahnoza Yuldasheva_demo | Physics Cohort D_demo |
-| madina.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Madina Yuldasheva_demo | Physics Cohort D_demo |
-| feruza.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Feruza Yuldasheva_demo | Physics Cohort D_demo |
-| nigora.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Nigora Yuldasheva_demo | Physics Cohort D_demo |
-| laylo.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Laylo Yuldasheva_demo | Physics Cohort D_demo |
-| umida.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Umida Yuldasheva_demo | Physics Cohort D_demo |
-| sitora.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Sitora Yuldasheva_demo | Physics Cohort D_demo |
-| aziza.yuldasheva_demo@secondteacher.dev | `DemoSeed2026!` | Aziza Yuldasheva_demo | Physics Cohort D_demo |
+| aisha.martinez_demo@secondteacher.dev | `DemoSeed2026!` | Aisha Martinez_demo | Physics 101 — Spring 2026 |
+| brian.chen_demo@secondteacher.dev | `DemoSeed2026!` | Brian Chen_demo | Physics 101 — Spring 2026 |
+| carmen.okafor_demo@secondteacher.dev | `DemoSeed2026!` | Carmen Okafor_demo | Physics 101 — Spring 2026 |
+| david.petrov_demo@secondteacher.dev | `DemoSeed2026!` | David Petrov_demo | Physics 101 — Spring 2026 |
+| elena.nguyen_demo@secondteacher.dev | `DemoSeed2026!` | Elena Nguyen_demo | Physics 101 — Spring 2026 |
+| fatima.johansson_demo@secondteacher.dev | `DemoSeed2026!` | Fatima Johansson_demo | Physics 101 — Spring 2026 |
+| gabriel.al.rashid_demo@secondteacher.dev | `DemoSeed2026!` | Gabriel Al-Rashid_demo | Physics 101 — Spring 2026 |
+| hannah.tanaka_demo@secondteacher.dev | `DemoSeed2026!` | Hannah Tanaka_demo | Physics 101 — Spring 2026 |
+| ivan.williams_demo@secondteacher.dev | `DemoSeed2026!` | Ivan Williams_demo | Physics 101 — Spring 2026 |
+| jasmine.kumar_demo@secondteacher.dev | `DemoSeed2026!` | Jasmine Kumar_demo | Physics 101 — Spring 2026 |
+| kevin.fernandez_demo@secondteacher.dev | `DemoSeed2026!` | Kevin Fernandez_demo | Physics 101 — Spring 2026 |
+| lila.kim_demo@secondteacher.dev | `DemoSeed2026!` | Lila Kim_demo | Physics 101 — Spring 2026 |
+| marcus.abadi_demo@secondteacher.dev | `DemoSeed2026!` | Marcus Abadi_demo | Physics 101 — Spring 2026 |
+| nadia.o.brien_demo@secondteacher.dev | `DemoSeed2026!` | Nadia O'Brien_demo | Physics 101 — Spring 2026 |
+| omar.volkov_demo@secondteacher.dev | `DemoSeed2026!` | Omar Volkov_demo | Physics 101 — Spring 2026 |
+| priya.martinez_demo@secondteacher.dev | `DemoSeed2026!` | Priya Martinez_demo | Physics 101 — Spring 2026 |
+| quinn.chen_demo@secondteacher.dev | `DemoSeed2026!` | Quinn Chen_demo | Physics 101 — Spring 2026 |
+| rosa.okafor_demo@secondteacher.dev | `DemoSeed2026!` | Rosa Okafor_demo | Physics 101 — Spring 2026 |
+| samuel.petrov_demo@secondteacher.dev | `DemoSeed2026!` | Samuel Petrov_demo | Physics 101 — Spring 2026 |
+| tanya.nguyen_demo@secondteacher.dev | `DemoSeed2026!` | Tanya Nguyen_demo | Physics 101 — Spring 2026 |
+| umar.johansson_demo@secondteacher.dev | `DemoSeed2026!` | Umar Johansson_demo | Physics 101 — Spring 2026 |
+| valentina.al.rashid_demo@secondteacher.dev | `DemoSeed2026!` | Valentina Al-Rashid_demo | Physics 101 — Spring 2026 |
+| william.tanaka_demo@secondteacher.dev | `DemoSeed2026!` | William Tanaka_demo | Physics 101 — Spring 2026 |
+| xiomara.williams_demo@secondteacher.dev | `DemoSeed2026!` | Xiomara Williams_demo | Physics 101 — Spring 2026 |
+| yusuf.kumar_demo@secondteacher.dev | `DemoSeed2026!` | Yusuf Kumar_demo | Physics 101 — Spring 2026 |
+| zara.fernandez_demo@secondteacher.dev | `DemoSeed2026!` | Zara Fernandez_demo | Physics 101 — Spring 2026 |
+| andre.kim_demo@secondteacher.dev | `DemoSeed2026!` | Andre Kim_demo | Physics 101 — Spring 2026 |
+| bianca.abadi_demo@secondteacher.dev | `DemoSeed2026!` | Bianca Abadi_demo | Physics 101 — Spring 2026 |
+| carlos.o.brien_demo@secondteacher.dev | `DemoSeed2026!` | Carlos O'Brien_demo | Physics 101 — Spring 2026 |
+| diana.volkov_demo@secondteacher.dev | `DemoSeed2026!` | Diana Volkov_demo | Physics 101 — Spring 2026 |

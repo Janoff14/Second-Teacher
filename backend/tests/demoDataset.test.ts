@@ -19,7 +19,7 @@ import {
 } from "../src/seed/demoDataset";
 
 describe("demo assessment specs", () => {
-  it("includes enough practices, quizzes, and exams for roster-scale testing", () => {
+  it("includes practices, quizzes, and exams for roster-scale testing", () => {
     const specs = buildDemoAssessmentSpecs();
     expect(specs.filter((s) => s.kind === "practice")).toHaveLength(5);
     expect(specs.filter((s) => s.kind === "quiz")).toHaveLength(5);
@@ -30,8 +30,8 @@ describe("demo assessment specs", () => {
 });
 
 describe("partitionStudentsAcrossSections", () => {
-  it("splits 120 into four balanced sections", () => {
-    expect(partitionStudentsAcrossSections(120, 4)).toEqual([30, 30, 30, 30]);
+  it("puts all 30 students in a single section", () => {
+    expect(partitionStudentsAcrossSections(30, 1)).toEqual([30]);
   });
   it("distributes remainder across early sections", () => {
     expect(partitionStudentsAcrossSections(8, 4)).toEqual([2, 2, 2, 2]);
@@ -71,7 +71,7 @@ describe("seedDemoDataset", () => {
     await seedDefaultUsers();
   });
 
-  it("seeds reduced cohort quickly with four sections and a dedicated teacher", async () => {
+  it("seeds reduced cohort quickly with one section and a dedicated teacher", async () => {
     const s = await seedDemoDataset({ studentCount: 8 });
     expect(s.teacherEmail).toBe("kamila.saidova_demo@secondteacher.dev");
     expect(s.groupIds.length).toBe(DEMO_SEED_SECTION_COUNT);
@@ -84,7 +84,7 @@ describe("seedDemoDataset", () => {
       quiz: 5 * DEMO_SEED_SECTION_COUNT,
       exam: 3 * DEMO_SEED_SECTION_COUNT,
     });
-    expect(s.attemptCount).toBeGreaterThan(80);
+    expect(s.attemptCount).toBeGreaterThan(20);
     expect(totalDemoAttemptsInGroups(s.groupIds)).toBe(s.attemptCount);
     for (let i = 0; i < s.groupIds.length; i++) {
       expect(listEnrollmentsForGroup(s.groupIds[i]!).length).toBe(s.studentsPerSection[i]);
@@ -93,7 +93,7 @@ describe("seedDemoDataset", () => {
     expect(listAttemptsForVersion(practiceVid).length).toBeGreaterThanOrEqual(4);
   }, 60_000);
 
-  it(`seeds ${DEMO_STUDENT_COUNT} students across sections with mirrored assessments`, async () => {
+  it(`seeds ${DEMO_STUDENT_COUNT} students in one section with all assessments`, async () => {
     const s = await seedDemoDataset();
     expect(s.studentCount).toBe(DEMO_STUDENT_COUNT);
     expect(s.groupIds.length).toBe(DEMO_SEED_SECTION_COUNT);
@@ -102,10 +102,10 @@ describe("seedDemoDataset", () => {
     expect(s.byKind.practice).toBe(5 * DEMO_SEED_SECTION_COUNT);
     expect(s.byKind.quiz).toBe(5 * DEMO_SEED_SECTION_COUNT);
     expect(s.byKind.exam).toBe(3 * DEMO_SEED_SECTION_COUNT);
-    expect(s.attemptCount).toBeGreaterThan(3500);
+    expect(s.attemptCount).toBeGreaterThan(500);
     expect(totalDemoAttemptsInGroups(s.groupIds)).toBe(s.attemptCount);
     const practiceVid = s.publishedVersionIds[0]!;
-    expect(listAttemptsForVersion(practiceVid).length).toBeGreaterThanOrEqual(100);
+    expect(listAttemptsForVersion(practiceVid).length).toBeGreaterThanOrEqual(20);
   }, 180_000);
 
   it("keeps the dedicated demo teacher out of the student roster", async () => {
