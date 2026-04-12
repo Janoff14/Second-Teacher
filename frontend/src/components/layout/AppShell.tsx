@@ -104,7 +104,7 @@ export function AppShell({
 
   function handleLogout() {
     clearSession();
-    router.push("/login");
+    router.push("/");
   }
 
   function closePalette() {

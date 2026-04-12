@@ -26,7 +26,7 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
               window.location.pathname + window.location.search,
             )
           : "";
-      router.replace(path ? `/login?from=${path}` : "/login");
+      router.replace("/");
       return;
     }
     if (role && !allowedRoles.includes(role)) {

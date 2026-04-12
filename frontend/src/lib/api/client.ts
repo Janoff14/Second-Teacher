@@ -23,7 +23,7 @@ function redirectToLoginIfNeeded(): void {
   const path = window.location.pathname;
   if (path.startsWith("/login") || path.startsWith("/join")) return;
   const from = encodeURIComponent(path + window.location.search);
-  window.location.assign(`/login?session=expired&from=${from}`);
+  window.location.assign("/");
 }
 
 /**

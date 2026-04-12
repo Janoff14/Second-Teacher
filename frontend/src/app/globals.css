@@ -3,19 +3,76 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fafbff;
+  --foreground: #1a1a2e;
+  --brand-glow: rgba(99, 102, 241, 0.08);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0c0c1d;
+    --foreground: #e8e8f0;
+    --brand-glow: rgba(99, 102, 241, 0.12);
   }
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  ::selection {
+    background-color: rgba(99, 102, 241, 0.2);
+    color: inherit;
+  }
+
+  input:focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    border-color: #818cf8;
+  }
+
+  [data-theme="dark"] input:focus,
+  [data-theme="dark"] textarea:focus,
+  [data-theme="dark"] select:focus {
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.2);
+    border-color: #6366f1;
+  }
+}
+
+@layer utilities {
+  .text-gradient-brand {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .text-gradient-accent {
+    background: linear-gradient(135deg, #14b8a6, #06b6d4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .bg-glass {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bg-glass {
+      background: rgba(12, 12, 29, 0.75);
+    }
+  }
+
+  .bg-dot-pattern {
+    background-image: radial-gradient(circle, rgba(99, 102, 241, 0.08) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
 }

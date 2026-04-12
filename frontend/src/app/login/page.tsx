@@ -99,23 +99,6 @@ function LoginContent() {
         </p>
       )}
 
-      {process.env.NODE_ENV === "development" && (
-        <p className="mt-4 rounded-md border border-neutral-600 bg-neutral-900/50 px-3 py-2 text-xs leading-relaxed text-neutral-400">
-          <span className="font-medium text-neutral-300">Dev</span>:{" "}
-          <code className="text-neutral-300">demo.seed.teacher@secondteacher.dev</code> va barcha{" "}
-          <code className="text-neutral-300">demo.seed.s*</code> studentlar paroli{" "}
-          <code className="text-neutral-300">DemoSeed2026!</code>;{" "}
-          <code className="text-neutral-300">teacher@secondteacher.dev</code> uchun{" "}
-          <code className="text-neutral-300">ChangeMe123!</code>. &quot;Ism Familya&quot; faqat forma; login
-          API ga email va parol yuboriladi. Boshqa kompyuterda ishlagan bo&apos;lsa,{" "}
-          <code className="text-neutral-300">frontend/.env.local</code> ichidagi{" "}
-          <code className="text-neutral-300">NEXT_PUBLIC_API_BASE_URL</code> shu yerdagi backend ga
-          ishora qilishi kerak (odatda <code className="text-neutral-300">http://localhost:4000</code>).
-          Backendda <code className="text-neutral-300">SUPABASE_*</code> yoqilgan bo&apos;lsa,
-          foydalanuvchilar boshqa muhitdagi kabi bo&apos;lmasligi mumkin.
-        </p>
-      )}
-
       <ErrorBox message={error} />
 
       <form onSubmit={handleLogin} className="mt-6 space-y-4">

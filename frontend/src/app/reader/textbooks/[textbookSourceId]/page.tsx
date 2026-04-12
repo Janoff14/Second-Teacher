@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import mammoth from "mammoth";
 import {
   getReaderDocument,
   getReaderDocumentAsset,
@@ -252,11 +253,21 @@ export default function ReaderPage() {
     };
   }, [document, groupId, textbookSourceId]);
 
+  const [docxHtml, setDocxHtml] = useState<string | null>(null);
+  const [docxError, setDocxError] = useState<string | null>(null);
+
   const backHref = useMemo(() => resolveBackHref(role, groupId), [role, groupId]);
   const isPdf = Boolean(
     document?.asset.available &&
       (document.source.sourceFormat === "pdf" ||
         (document.asset.available && document.asset.mimeType === "application/pdf")),
+  );
+  const isDocx = Boolean(
+    document?.asset.available &&
+      (document.source.sourceFormat === "docx" ||
+        (document.asset.available &&
+          document.asset.mimeType ===
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document")),
   );
   const activeChapter = useMemo(
     () => (document ? getChapterForPage(document.chapters, selectedPage) : null),
@@ -267,7 +278,41 @@ export default function ReaderPage() {
     if (!isPdf) return assetUrl;
     return `${assetUrl}#page=${selectedPage}&view=FitH`;
   }, [assetUrl, isPdf, selectedPage]);
-  const showTextFallback = Boolean(document && (!document.asset.available || assetError));
+  const showTextFallback = Boolean(
+    document && (!document.asset.available || assetError) && !isDocx,
+  );
+
+  const convertDocx = useCallback(async (blob: Blob) => {
+    try {
+      const arrayBuffer = await blob.arrayBuffer();
+      const result = await mammoth.convertToHtml({ arrayBuffer });
+      setDocxHtml(result.value);
+    } catch {
+      setDocxError("Could not render the DOCX file in the browser.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isDocx || !assetUrl) {
+      setDocxHtml(null);
+      setDocxError(null);
+      return;
+    }
+    fetch(assetUrl)
+      .then((r) => r.blob())
+      .then(convertDocx)
+      .catch(() => setDocxError("Failed to load the DOCX file for preview."));
+  }, [isDocx, assetUrl, convertDocx]);
+
+  const handleDownload = useCallback(() => {
+    if (!assetUrl || !document) return;
+    const a = window.document.createElement("a");
+    a.href = assetUrl;
+    a.download =
+      document.source.originalFileName ??
+      `${document.source.title}.${document.source.sourceFormat ?? "bin"}`;
+    a.click();
+  }, [assetUrl, document]);
 
   if (loading) {
     return <p className="text-sm text-neutral-500">Loading textbook reader...</p>;
@@ -410,7 +455,17 @@ export default function ReaderPage() {
                   </>
                 ) : null}
 
-                {viewerSrc ? (
+                {assetUrl ? (
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    className="rounded-xl border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-200 dark:hover:bg-neutral-900"
+                  >
+                    Download original
+                  </button>
+                ) : null}
+
+                {isPdf && viewerSrc ? (
                   <a
                     href={viewerSrc}
                     target="_blank"
@@ -428,7 +483,29 @@ export default function ReaderPage() {
                 <div className="flex min-h-[72vh] items-center justify-center px-6 text-sm text-neutral-500 dark:text-neutral-400">
                   Preparing the original document viewer...
                 </div>
-              ) : viewerSrc ? (
+              ) : isDocx && docxHtml ? (
+                <div
+                  className="prose prose-neutral dark:prose-invert max-w-none min-h-[72vh] overflow-auto bg-white px-8 py-6 dark:bg-neutral-950"
+                  dangerouslySetInnerHTML={{ __html: docxHtml }}
+                />
+              ) : isDocx && docxError ? (
+                <div className="flex min-h-[72vh] flex-col items-center justify-center gap-4 px-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
+                  <p>{docxError}</p>
+                  {assetUrl ? (
+                    <button
+                      type="button"
+                      onClick={handleDownload}
+                      className="rounded-xl border border-blue-300 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300 dark:hover:bg-blue-950/50"
+                    >
+                      Download the original file instead
+                    </button>
+                  ) : null}
+                </div>
+              ) : isDocx && assetUrl ? (
+                <div className="flex min-h-[72vh] items-center justify-center px-6 text-sm text-neutral-500 dark:text-neutral-400">
+                  Converting document for preview...
+                </div>
+              ) : isPdf && viewerSrc ? (
                 <iframe
                   title={document.source.title}
                   src={viewerSrc}
@@ -447,7 +524,9 @@ export default function ReaderPage() {
               <p>
                 {isPdf
                   ? "PDF chapter jumps use the page numbers discovered during ingestion."
-                  : "PDF files support direct chapter jumps best. Other file types open natively when the browser can preview them."}
+                  : isDocx
+                    ? "DOCX files are rendered as formatted HTML. Download the original for full fidelity."
+                    : "PDF files support direct chapter jumps best. Other file types open natively when the browser can preview them."}
               </p>
               {activeChapter ? (
                 <p className="font-medium text-neutral-700 dark:text-neutral-200">
