@@ -45,4 +45,29 @@ export function hasOpenAI(): boolean {
   return !!env.OPENAI_API_KEY;
 }
 
+const BRIEFING_MODEL = "gpt-4o-mini";
+
+/**
+ * Short teacher-facing copy; returns null if no API key or on failure.
+ */
+export async function briefCompletion(system: string, user: string): Promise<string | null> {
+  const client = getOpenAIClient();
+  if (!client) return null;
+  try {
+    const resp = await client.chat.completions.create({
+      model: BRIEFING_MODEL,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      max_completion_tokens: 400,
+    });
+    const text = resp.choices[0]?.message?.content?.trim();
+    return text && text.length > 0 ? text : null;
+  } catch (err) {
+    logger.warn({ err }, "brief_completion_failed");
+    return null;
+  }
+}
+
 export { EMBEDDING_DIM };

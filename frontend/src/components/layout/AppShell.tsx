@@ -2,6 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { TeacherCommandPalette } from "@/components/teacher/TeacherCommandPalette";
+import { getTeacherAiBriefing } from "@/lib/api/assessments";
 import { useAuthStore } from "@/stores/auth-store";
 import type { UserRole } from "@/stores/auth-store";
 
@@ -54,6 +57,43 @@ export function AppShell({
   const role = useAuthStore((s) => s.role) as UserRole | null;
   const activeGroupId = useAuthStore((s) => s.activeGroupId);
   const clearSession = useAuthStore((s) => s.clearSession);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [attentionCount, setAttentionCount] = useState<number | null>(null);
+
+  const teacherGroupFromPath =
+    section === "teacher" && pathname.startsWith("/teacher/groups/")
+      ? (pathname.match(/^\/teacher\/groups\/([^/]+)/)?.[1] ?? null)
+      : null;
+  const decodedTeacherGroupId = teacherGroupFromPath
+    ? decodeURIComponent(teacherGroupFromPath)
+    : null;
+
+  const refreshAttention = useCallback(async () => {
+    if (!decodedTeacherGroupId) {
+      setAttentionCount(null);
+      return;
+    }
+    const res = await getTeacherAiBriefing(decodedTeacherGroupId, false);
+    if (res.ok && res.data) {
+      setAttentionCount(res.data.attentionNeeded);
+    }
+  }, [decodedTeacherGroupId]);
+
+  useEffect(() => {
+    void refreshAttention();
+  }, [refreshAttention]);
+
+  useEffect(() => {
+    if (section !== "teacher") return;
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setPaletteOpen((open) => !open);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [section]);
 
   const tabs =
     section === "admin"
@@ -67,8 +107,20 @@ export function AppShell({
     router.push("/login");
   }
 
+  function closePalette() {
+    setPaletteOpen(false);
+    void refreshAttention();
+  }
+
   return (
     <div className="flex min-h-screen flex-col">
+      {section === "teacher" ? (
+        <TeacherCommandPalette
+          groupId={decodedTeacherGroupId}
+          open={paletteOpen}
+          onClose={closePalette}
+        />
+      ) : null}
       <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <div className="flex flex-wrap items-center gap-4">
@@ -95,6 +147,21 @@ export function AppShell({
             </nav>
           </div>
           <div className="flex items-center gap-3 text-sm text-neutral-600 dark:text-neutral-400">
+            {section === "teacher" ? (
+              <button
+                type="button"
+                title="Open class assistant (Ctrl+K or Cmd+K)"
+                onClick={() => setPaletteOpen(true)}
+                className="relative rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-800 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-900"
+              >
+                Assistant
+                {attentionCount != null && attentionCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-semibold text-white">
+                    {attentionCount > 9 ? "9+" : attentionCount}
+                  </span>
+                ) : null}
+              </button>
+            ) : null}
             {role && (
               <span className="rounded bg-neutral-100 px-2 py-0.5 capitalize dark:bg-neutral-800">
                 {role}

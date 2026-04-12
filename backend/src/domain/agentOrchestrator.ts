@@ -8,6 +8,9 @@ import {
 } from "./assessmentStore";
 import { listInsightsForStudent, listInsightsForTeacher, type InsightRecord } from "./insightsStore";
 import { queryCorpus, type RetrievalCitation, type RetrievalHit } from "./ragStore";
+import { detectGroupPatterns } from "./teacherBriefing";
+import { briefCompletion, hasOpenAI } from "../lib/openai";
+import type { TeacherBriefingPayload } from "./teacherBriefing";
 
 export type AgentToolRun = {
   name: string;
@@ -19,6 +22,30 @@ export type AgentToolRun = {
 export type AgentChatResult = {
   reply: string;
   tools: AgentToolRun[];
+  citations: RetrievalCitation[];
+  fallback: boolean;
+};
+
+export type BriefingQueryCard =
+  | { kind: "note"; title?: string; body: string }
+  | {
+      kind: "insight_row";
+      studentId: string;
+      title: string;
+      riskLevel: string;
+      factors: string[];
+    }
+  | { kind: "corpus_row"; anchor: string; excerpt: string }
+  | {
+      kind: "pattern";
+      patternType: string;
+      description: string;
+      suggestedAction: string;
+      studentCount: number;
+    };
+
+export type BriefingQueryResult = {
+  cards: BriefingQueryCard[];
   citations: RetrievalCitation[];
   fallback: boolean;
 };
@@ -119,6 +146,122 @@ function buildStudentReply(
   lines.push("");
   lines.push(`_You asked:_ ${message.slice(0, 400)}${message.length > 400 ? "…" : ""}`);
   return lines.join("\n");
+}
+
+export async function enrichTeacherBriefingWithOptionalLLM(
+  payload: TeacherBriefingPayload,
+): Promise<TeacherBriefingPayload> {
+  const groupPatterns = await enrichGroupPatternsWithOptionalLLM(payload.groupPatterns);
+
+  if (!hasOpenAI() || payload.students.length === 0) {
+    return { ...payload, groupPatterns };
+  }
+  const input = payload.students.map((s) => ({
+    studentId: s.studentId,
+    riskLevel: s.riskLevel,
+    insightType: s.insightType,
+    factorCodes: s.factors.map((f) => f.code),
+    recentScores: s.recentScores,
+    templateReasoning: s.reasoning,
+  }));
+  const system =
+    'You help teachers prioritize students. Given JSON rows, respond with ONLY a JSON object shaped as {"lines":[{"studentId":"...","reasoning":"one empathetic sentence, max 30 words"}]} — one reasoning per input row, same order, same studentIds. No markdown or extra keys.';
+  const raw = await briefCompletion(system, JSON.stringify(input));
+  if (!raw) {
+    return { ...payload, groupPatterns };
+  }
+  try {
+    const parsed = JSON.parse(raw) as { lines?: { studentId: string; reasoning: string }[] };
+    if (!Array.isArray(parsed.lines) || parsed.lines.length === 0) {
+      return { ...payload, groupPatterns };
+    }
+    const byId = new Map(parsed.lines.map((l) => [l.studentId, l.reasoning]));
+    return {
+      ...payload,
+      groupPatterns,
+      students: payload.students.map((s) => ({
+        ...s,
+        reasoning: byId.get(s.studentId)?.trim() || s.reasoning,
+      })),
+    };
+  } catch {
+    return { ...payload, groupPatterns };
+  }
+}
+
+async function enrichGroupPatternsWithOptionalLLM(
+  patterns: TeacherBriefingPayload["groupPatterns"],
+): Promise<TeacherBriefingPayload["groupPatterns"]> {
+  if (!hasOpenAI() || patterns.length === 0) return patterns;
+  const raw = await briefCompletion(
+    "Rewrite each pattern's description as one clearer sentence for a teacher (max 25 words). Respond ONLY JSON: {\"items\":[{\"description\":\"...\"}]} in the same order as input.",
+    JSON.stringify(patterns.map((p) => ({ description: p.description, suggestedAction: p.suggestedAction }))),
+  );
+  if (!raw) return patterns;
+  try {
+    const parsed = JSON.parse(raw) as { items?: { description: string }[] };
+    if (!Array.isArray(parsed.items) || parsed.items.length !== patterns.length) return patterns;
+    return patterns.map((p, i) => ({
+      ...p,
+      description: parsed.items![i]!.description?.trim() || p.description,
+    }));
+  } catch {
+    return patterns;
+  }
+}
+
+export async function runTeacherBriefingQuery(params: {
+  groupId: string;
+  message: string;
+  timeoutMs: number;
+  requestId?: string;
+}): Promise<BriefingQueryResult> {
+  const base = await runTeacherAgentChat({
+    groupId: params.groupId,
+    message: params.message,
+    timeoutMs: params.timeoutMs,
+    ...(params.requestId !== undefined ? { requestId: params.requestId } : {}),
+  });
+
+  const cards: BriefingQueryCard[] = [{ kind: "note", title: "Assistant summary", body: base.reply }];
+
+  const insightRun = base.tools.find((t) => t.name === "get_insights");
+  if (insightRun?.ok && Array.isArray(insightRun.data)) {
+    for (const ins of insightRun.data as InsightRecord[]) {
+      if (ins.audience !== "teacher") continue;
+      cards.push({
+        kind: "insight_row",
+        studentId: ins.studentId,
+        title: ins.title,
+        riskLevel: ins.riskLevel,
+        factors: ins.factors.map((f) => f.message),
+      });
+    }
+  }
+
+  const searchRun = base.tools.find((t) => t.name === "search_corpus");
+  if (searchRun?.ok && Array.isArray(searchRun.data)) {
+    for (const h of searchRun.data as RetrievalHit[]) {
+      const text = h.text;
+      cards.push({
+        kind: "corpus_row",
+        anchor: h.citation.anchor,
+        excerpt: text.length > 220 ? `${text.slice(0, 220)}…` : text,
+      });
+    }
+  }
+
+  for (const p of detectGroupPatterns(params.groupId)) {
+    cards.push({
+      kind: "pattern",
+      patternType: p.patternType,
+      description: p.description,
+      suggestedAction: p.suggestedAction,
+      studentCount: p.affectedStudentIds.length,
+    });
+  }
+
+  return { cards, citations: base.citations, fallback: base.fallback };
 }
 
 export async function runTeacherAgentChat(params: {

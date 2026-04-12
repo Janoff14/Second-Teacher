@@ -15,8 +15,16 @@ import {
   revokeJoinCodeById,
 } from "../domain/academicStore";
 import { appendAuditLog } from "../domain/auditStore";
-import { listStudentAttemptsInGroup } from "../domain/assessmentStore";
-import { classifyRiskFromSnapshot, computeRiskFeatureSnapshot } from "../domain/insightsStore";
+import {
+  listAttemptsForVersion,
+  listPublishedVersionsForGroup,
+  listStudentAttemptsInGroup,
+} from "../domain/assessmentStore";
+import {
+  classifyRiskFromSnapshot,
+  computeRiskFeatureSnapshot,
+  listInsightsForTeacher,
+} from "../domain/insightsStore";
 import { buildStudentAcademicScope } from "../domain/studentExperience";
 import { getUserById } from "../domain/userStore";
 import { requireAuth, requireRole } from "../middleware/auth";
@@ -150,12 +158,24 @@ academicRouter.get(
         err.code = "FORBIDDEN";
         throw err;
       }
+      const lowLoadByStudent = new Map(
+        listInsightsForTeacher(groupId, { status: "open" })
+          .filter((i) => i.type === "low_load")
+          .map((i) => [i.studentId, i] as const),
+      );
       const students = await Promise.all(
         listEnrollmentsForGroup(groupId).map(async (e) => {
           const user = await getUserById(e.studentId);
           const attempts = listStudentAttemptsInGroup(e.studentId, groupId);
           const latestAttempt = attempts.length > 0 ? attempts[attempts.length - 1]!.attempt : null;
           const risk = classifyRiskFromSnapshot(computeRiskFeatureSnapshot(e.studentId, groupId));
+          const openLow = lowLoadByStudent.get(e.studentId);
+          const displayRisk =
+            risk.level === "stable" && openLow ? ("low_load" as const) : risk.level;
+          const riskReason =
+            displayRisk === "low_load" && openLow
+              ? openLow.factors.map((f) => f.message).join(" ") || openLow.title
+              : risk.reasons[0]?.message ?? null;
           return {
             studentId: e.studentId,
             displayName: user?.displayName ?? null,
@@ -167,12 +187,151 @@ academicRouter.get(
               latestAttempt && latestAttempt.maxScore > 0
                 ? Math.round((latestAttempt.totalScore / latestAttempt.maxScore) * 1000) / 10
                 : null,
-            riskLevel: risk.level,
-            riskReason: risk.reasons[0]?.message ?? null,
+            riskLevel: displayRisk,
+            riskReason,
           };
         }),
       );
       res.status(200).json({ data: students });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+function inferAssessmentType(title: string): string {
+  const n = title.trim().toLowerCase();
+  if (n.startsWith("practice")) return "practice";
+  if (n.startsWith("quiz")) return "quiz";
+  if (n.startsWith("test")) return "test";
+  if (n.startsWith("exam")) return "exam";
+  return "assessment";
+}
+
+academicRouter.get(
+  "/groups/:groupId/students/:studentId/profile",
+  requireAuth,
+  requireRole(["admin", "teacher"]),
+  async (req, res, next) => {
+    try {
+      const { groupId, studentId } = req.params;
+      if (!groupId || !studentId) throw new Error("groupId and studentId required");
+      const user = req.user!;
+      if (!canTeacherManageGroup(user.userId, user.role, groupId)) {
+        const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 403;
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+
+      const student = await getUserById(studentId);
+      const snapshot = computeRiskFeatureSnapshot(studentId, groupId);
+      const classification = classifyRiskFromSnapshot(snapshot);
+
+      const rows = listStudentAttemptsInGroup(studentId, groupId);
+      const versions = listPublishedVersionsForGroup(groupId);
+      const versionMap = new Map(versions.map((v) => [v.id, v]));
+
+      const attempts = rows.map((r) => {
+        const v = versionMap.get(r.versionId);
+        const scorePct =
+          r.attempt.maxScore > 0
+            ? Math.round((r.attempt.totalScore / r.attempt.maxScore) * 1000) / 10
+            : 0;
+        return {
+          attemptId: r.attempt.id,
+          versionId: r.versionId,
+          assessmentTitle: v?.title ?? "Unknown",
+          assessmentType: v ? inferAssessmentType(v.title) : "assessment",
+          submittedAt: r.attempt.submittedAt,
+          totalScore: r.attempt.totalScore,
+          maxScore: r.attempt.maxScore,
+          scorePct,
+        };
+      });
+
+      const perAssessment = versions.map((v) => {
+        const studentAttempts = rows
+          .filter((r) => r.versionId === v.id)
+          .map((r) => ({
+            attemptId: r.attempt.id,
+            submittedAt: r.attempt.submittedAt,
+            totalScore: r.attempt.totalScore,
+            maxScore: r.attempt.maxScore,
+            scorePct:
+              r.attempt.maxScore > 0
+                ? Math.round((r.attempt.totalScore / r.attempt.maxScore) * 1000) / 10
+                : 0,
+          }));
+        const allAttempts = listAttemptsForVersion(v.id);
+        const classAvg =
+          allAttempts.length > 0
+            ? Math.round(
+                (allAttempts.reduce(
+                  (s, a) => s + (a.maxScore > 0 ? a.totalScore / a.maxScore : 0),
+                  0,
+                ) /
+                  allAttempts.length) *
+                  1000,
+              ) / 10
+            : null;
+        return {
+          versionId: v.id,
+          title: v.title,
+          type: inferAssessmentType(v.title),
+          itemCount: v.items.length,
+          classAveragePct: classAvg,
+          studentAttempts,
+          bestScorePct:
+            studentAttempts.length > 0
+              ? Math.max(...studentAttempts.map((a) => a.scorePct))
+              : null,
+          latestScorePct:
+            studentAttempts.length > 0
+              ? studentAttempts[studentAttempts.length - 1]!.scorePct
+              : null,
+        };
+      });
+
+      const insights = listInsightsForTeacher(groupId, { status: "all" }).filter(
+        (i) => i.studentId === studentId,
+      );
+
+      res.status(200).json({
+        data: {
+          studentId,
+          displayName: student?.displayName ?? null,
+          email: student?.email ?? null,
+          riskLevel: classification.level,
+          riskConfidence: classification.confidence,
+          riskFactors: classification.reasons,
+          features: snapshot.features,
+          totalAttempts: rows.length,
+          overallAveragePct:
+            rows.length > 0
+              ? Math.round(
+                  (rows.reduce(
+                    (s, r) =>
+                      s + (r.attempt.maxScore > 0 ? r.attempt.totalScore / r.attempt.maxScore : 0),
+                    0,
+                  ) /
+                    rows.length) *
+                    1000,
+                ) / 10
+              : null,
+          attempts,
+          perAssessment,
+          insights: insights.map((i) => ({
+            id: i.id,
+            title: i.title,
+            body: i.body,
+            riskLevel: i.riskLevel,
+            factors: i.factors,
+            status: i.status,
+            updatedAt: i.updatedAt,
+          })),
+        },
+      });
     } catch (e) {
       next(e);
     }

@@ -2,7 +2,11 @@ import { Router } from "express";
 import { z } from "zod";
 import { env } from "../config/env";
 import { canTeacherManageGroup, isStudentInGroup } from "../domain/academicStore";
-import { runStudentAgentChat, runTeacherAgentChat } from "../domain/agentOrchestrator";
+import {
+  runStudentAgentChat,
+  runTeacherAgentChat,
+  runTeacherBriefingQuery,
+} from "../domain/agentOrchestrator";
 import { appendAuditLog } from "../domain/auditStore";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
@@ -59,6 +63,47 @@ agentRouter.post(
         metadata: {
           fallback: result.fallback,
           tools: result.tools.map((t) => t.name),
+          citationCount: result.citations.length,
+        },
+      });
+      res.status(200).json({ data: result });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+agentRouter.post(
+  "/agent/teacher/briefing-query",
+  requireAuth,
+  requireRole(["admin", "teacher"]),
+  validateBody(chatSchema),
+  async (req, res, next) => {
+    try {
+      const user = req.user!;
+      const body = req.body as z.infer<typeof chatSchema>;
+      if (user.role === "teacher" && !canTeacherManageGroup(user.userId, user.role, body.groupId)) {
+        const err = new Error("Forbidden for this group") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 403;
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+      const timeoutMs = resolveAgentTimeoutMs(req);
+      const result = await runTeacherBriefingQuery({
+        groupId: body.groupId,
+        message: body.message,
+        timeoutMs,
+        ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
+      });
+      appendAuditLog({
+        ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
+        actorId: user.userId,
+        actorRole: user.role,
+        action: "AGENT_TEACHER_BRIEFING_QUERY",
+        scope: { groupId: body.groupId },
+        metadata: {
+          fallback: result.fallback,
+          cardCount: result.cards.length,
           citationCount: result.citations.length,
         },
       });

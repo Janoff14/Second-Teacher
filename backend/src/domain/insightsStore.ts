@@ -3,9 +3,12 @@ import {
   listEnrollmentsForGroup,
   listTeacherUserIdsForGroup,
 } from "./academicStore";
-import { listAttemptsForVersion, listStudentAttemptsInGroup } from "./assessmentStore";
+import { listAttemptsForVersion, listPublishedVersionsForGroup, listStudentAttemptsInGroup } from "./assessmentStore";
 
 export type RiskLevel = "stable" | "watchlist" | "at_risk";
+
+/** Teacher-facing insight badge; low_load is only used for `type: "low_load"` insights. */
+export type InsightRiskLevel = RiskLevel | "low_load";
 
 export type InsightStatus = "open" | "acknowledged" | "dismissed";
 
@@ -52,7 +55,7 @@ export interface InsightRecord {
   title: string;
   body: string;
   status: InsightStatus;
-  riskLevel: RiskLevel;
+  riskLevel: InsightRiskLevel;
   factors: RiskFactorEvidence[];
   dedupKey: string;
   createdAt: string;
@@ -173,6 +176,25 @@ export function computeRiskFeatureSnapshot(studentId: string, groupId: string): 
   };
 }
 
+/**
+ * Risk classification rules (deterministic, no LLM):
+ *
+ * AT_RISK — immediate teacher attention needed. ANY of:
+ *   1. Recent average score < 50%
+ *   2. 3+ of last 5 attempts scored below 60%
+ *   3. Scores declining AND recent average < 65%
+ *   4. Inactive 14+ days AND last known average was under 60%
+ *
+ * WATCHLIST — monitor closely. ANY of:
+ *   1. Recent average 50-65%
+ *   2. Scores declining (even if currently passing)
+ *   3. Inactive 14+ days with prior activity (regardless of score)
+ *   4. Low engagement: very few attempts despite available assessments
+ *
+ * STABLE — on track. None of the above triggered, OR:
+ *   - Student is improving (trend is up)
+ *   - Student is a high performer (recent avg > 80%)
+ */
 export function classifyRiskFromSnapshot(snapshot: RiskFeatureSnapshot): RiskClassification {
   const { features: f } = snapshot;
   const reasons: RiskFactorEvidence[] = [];
@@ -180,7 +202,7 @@ export function classifyRiskFromSnapshot(snapshot: RiskFeatureSnapshot): RiskCla
   if (f.attemptCount < 2) {
     reasons.push({
       code: "INSUFFICIENT_DATA",
-      message: "Need at least two scored attempts in this group to classify risk reliably.",
+      message: "Fewer than 2 attempts — not enough data to assess risk yet.",
       severity: "info",
     });
     return { level: "stable", confidence: 0.35, reasons };
@@ -188,13 +210,16 @@ export function classifyRiskFromSnapshot(snapshot: RiskFeatureSnapshot): RiskCla
 
   const recent = f.recentAvgRatio;
   const declining = f.trendLabel === "declining";
+  const improving = f.trendLabel === "improving";
   const inactive =
     f.daysSinceLastAttempt !== null && f.daysSinceLastAttempt > 14 && f.attemptCount >= 2;
+
+  // --- Collect evidence factors ---
 
   if (f.baselineDeviation !== null && f.baselineDeviation <= -0.2) {
     reasons.push({
       code: "BELOW_CLASS_BASELINE",
-      message: `Recent performance is roughly ${Math.round(Math.abs(f.baselineDeviation) * 100)} points below the class average on shared assessments.`,
+      message: `Scoring ~${Math.round(Math.abs(f.baselineDeviation) * 100)} points below the class average.`,
       severity: "warning",
     });
   }
@@ -202,15 +227,21 @@ export function classifyRiskFromSnapshot(snapshot: RiskFeatureSnapshot): RiskCla
   if (recent !== null && recent < 0.5) {
     reasons.push({
       code: "LOW_RECENT_SCORE",
-      message: `Average score on the last attempts is ${Math.round(recent * 100)}%.`,
+      message: `Recent average is ${Math.round(recent * 100)}% — below the 50% threshold.`,
       severity: "critical",
+    });
+  } else if (recent !== null && recent < 0.65) {
+    reasons.push({
+      code: "MODERATE_RECENT_SCORE",
+      message: `Recent average is ${Math.round(recent * 100)}% — in the 50-65% warning zone.`,
+      severity: "warning",
     });
   }
 
   if (f.lowScoreCountInLast5 >= 3) {
     reasons.push({
       code: "REPEATED_LOW_SCORES",
-      message: "Multiple recent attempts scored below 60%.",
+      message: `${f.lowScoreCountInLast5} of the last 5 attempts scored below 60%.`,
       severity: "critical",
     });
   }
@@ -218,13 +249,13 @@ export function classifyRiskFromSnapshot(snapshot: RiskFeatureSnapshot): RiskCla
   if (declining && recent !== null && recent < 0.65) {
     reasons.push({
       code: "DECLINING_PERFORMANCE",
-      message: "Performance trend is declining while recent scores are under 65%.",
+      message: "Scores are dropping and currently below 65%.",
       severity: "critical",
     });
   } else if (declining) {
     reasons.push({
       code: "DECLINING_TREND",
-      message: "Recent attempts are trending down versus earlier work in this group.",
+      message: "Scores are trending downward compared to earlier work.",
       severity: "warning",
     });
   }
@@ -232,41 +263,217 @@ export function classifyRiskFromSnapshot(snapshot: RiskFeatureSnapshot): RiskCla
   if (inactive) {
     reasons.push({
       code: "RECENT_INACTIVITY",
-      message: "No attempts in this group for over 14 days despite prior activity.",
-      severity: "warning",
+      message: `No activity for ${f.daysSinceLastAttempt} days despite prior engagement.`,
+      severity: recent !== null && recent < 0.6 ? "critical" : "warning",
     });
   }
 
-  if (recent !== null && recent < 0.65 && !reasons.some((r) => r.code === "LOW_RECENT_SCORE")) {
+  if (improving && recent !== null && recent >= 0.5) {
     reasons.push({
-      code: "MODERATE_RECENT_SCORE",
-      message: `Recent average is ${Math.round(recent * 100)}% (watch band).`,
-      severity: "warning",
+      code: "IMPROVING_TREND",
+      message: `Scores are improving — recent average is ${Math.round(recent * 100)}%.`,
+      severity: "info",
     });
   }
 
+  if (recent !== null && recent >= 0.8) {
+    reasons.push({
+      code: "HIGH_PERFORMER",
+      message: `Consistently strong — recent average is ${Math.round(recent * 100)}%.`,
+      severity: "info",
+    });
+  }
+
+  // --- Classification decision ---
   let level: RiskLevel = "stable";
-  if (
+
+  const atRisk =
     (recent !== null && recent < 0.5) ||
     f.lowScoreCountInLast5 >= 3 ||
-    (declining && recent !== null && recent < 0.65)
-  ) {
+    (declining && recent !== null && recent < 0.65) ||
+    (inactive && recent !== null && recent < 0.6);
+
+  const watchlist =
+    (recent !== null && recent >= 0.5 && recent < 0.65) ||
+    declining ||
+    inactive;
+
+  if (atRisk) {
     level = "at_risk";
-  } else if ((recent !== null && recent < 0.65) || declining || inactive) {
+  } else if (watchlist) {
     level = "watchlist";
   }
 
   const confidence = Math.min(0.95, 0.45 + 0.08 * Math.min(f.attemptCount, 8));
 
-  if (level === "stable" && reasons.length === 0) {
-    reasons.push({
-      code: "STABLE",
-      message: "No risk factors triggered for this group based on recent attempts.",
+  if (level === "stable" && !reasons.some((r) => r.severity !== "info")) {
+    if (reasons.length === 0) {
+      reasons.push({
+        code: "ON_TRACK",
+        message: "Performance is on track — no concerns detected.",
+        severity: "info",
+      });
+    }
+  }
+
+  return { level, confidence, reasons };
+}
+
+export interface LowLoadClassification {
+  active: boolean;
+  factors: RiskFactorEvidence[];
+}
+
+/**
+ * High performers / low instructional load — only meaningful when primary risk is stable.
+ */
+export function classifyLowLoadFromSnapshot(
+  snapshot: RiskFeatureSnapshot,
+  publishedAssessmentCount: number,
+): LowLoadClassification {
+  const { features: f } = snapshot;
+  const factors: RiskFactorEvidence[] = [];
+  if (f.attemptCount < 2 || f.recentAvgRatio === null) {
+    return { active: false, factors: [] };
+  }
+  const recent = f.recentAvgRatio;
+  if (recent <= 0.85) {
+    return { active: false, factors: [] };
+  }
+
+  let strongBaseline = false;
+  if (f.baselineDeviation !== null && f.baselineDeviation >= 0.2) {
+    strongBaseline = true;
+    factors.push({
+      code: "ABOVE_CLASS_BASELINE",
+      message: `Scoring ~${Math.round(f.baselineDeviation * 100)} points above the class average on recent work.`,
       severity: "info",
     });
   }
 
-  return { level, confidence, reasons };
+  let underParticipated = false;
+  if (publishedAssessmentCount >= 2) {
+    const expected = Math.max(1, Math.ceil(publishedAssessmentCount * 0.5));
+    if (f.attemptCount < expected && recent > 0.8) {
+      underParticipated = true;
+      factors.push({
+        code: "CAPACITY_FOR_MORE",
+        message: `Fewer attempts (${f.attemptCount}) than many classmates given ${publishedAssessmentCount} published assessments — may have unused capacity.`,
+        severity: "info",
+      });
+    }
+  }
+
+  const fastStrong =
+    recent > 0.85 &&
+    f.attemptsLast14Days >= 2 &&
+    f.lowScoreCountInLast5 === 0 &&
+    (f.trendLabel === "improving" || f.trendLabel === "flat");
+
+  if (fastStrong && !strongBaseline && !underParticipated) {
+    factors.push({
+      code: "HIGH_RECENT_PERFORMANCE",
+      message: `Recent average is ${Math.round(recent * 100)}% with no low scores in the last five attempts.`,
+      severity: "info",
+    });
+  }
+
+  const active =
+    recent > 0.85 && (strongBaseline || underParticipated || (fastStrong && factors.length > 0));
+
+  if (active && factors.length === 0) {
+    factors.push({
+      code: "HIGH_RECENT_PERFORMANCE",
+      message: `Recent average is ${Math.round(recent * 100)}% — consider additional challenge.`,
+      severity: "info",
+    });
+  }
+
+  return { active, factors };
+}
+
+function lowLoadDedupKey(studentId: string, groupId: string, audience: InsightAudience): string {
+  return `low_load:${studentId}:${groupId}:${audience}`;
+}
+
+function removeLowLoadInsightsForStudent(studentId: string, groupId: string): void {
+  for (let i = insights.length - 1; i >= 0; i--) {
+    const ins = insights[i]!;
+    if (ins.type === "low_load" && ins.studentId === studentId && ins.groupId === groupId) {
+      insights.splice(i, 1);
+    }
+  }
+}
+
+function upsertLowLoadInsight(
+  studentId: string,
+  groupId: string,
+  audience: InsightAudience,
+  factors: RiskFactorEvidence[],
+): InsightRecord {
+  const dedupKey = lowLoadDedupKey(studentId, groupId, audience);
+  const existing = insights.find((i) => i.dedupKey === dedupKey);
+  const now = new Date().toISOString();
+  const title =
+    audience === "teacher"
+      ? "Student load: ready for more challenge"
+      : "You may be ready for extra stretch";
+  const body =
+    audience === "teacher"
+      ? "Performance suggests capacity for extension work or leadership roles."
+      : "Your recent results are strong — consider optional challenges or helping peers.";
+
+  if (existing) {
+    existing.factors = factors;
+    existing.title = title;
+    existing.body = body;
+    existing.priority = 10;
+    existing.riskLevel = "low_load";
+    if (existing.status === "dismissed") {
+      existing.status = "open";
+    }
+    existing.updatedAt = now;
+    return existing;
+  }
+
+  const record: InsightRecord = {
+    id: `ins_${insightCounter++}`,
+    studentId,
+    groupId,
+    audience,
+    type: "low_load",
+    priority: 10,
+    title,
+    body,
+    status: "open",
+    riskLevel: "low_load",
+    factors,
+    dedupKey,
+    createdAt: now,
+    updatedAt: now,
+  };
+  insights.push(record);
+  return record;
+}
+
+function syncLowLoadInsights(
+  studentId: string,
+  groupId: string,
+  riskLevel: RiskLevel,
+  snapshot: RiskFeatureSnapshot,
+): void {
+  const publishedAssessmentCount = listPublishedVersionsForGroup(groupId).length;
+  if (riskLevel !== "stable") {
+    removeLowLoadInsightsForStudent(studentId, groupId);
+    return;
+  }
+  const low = classifyLowLoadFromSnapshot(snapshot, publishedAssessmentCount);
+  if (low.active) {
+    upsertLowLoadInsight(studentId, groupId, "teacher", low.factors);
+    upsertLowLoadInsight(studentId, groupId, "student", low.factors);
+  } else {
+    removeLowLoadInsightsForStudent(studentId, groupId);
+  }
 }
 
 function insightDedupKey(studentId: string, groupId: string, audience: InsightAudience): string {
@@ -378,6 +585,7 @@ export function refreshInsightsAfterAttempt(studentId: string, groupId: string):
 
   const teacherInsight = upsertInsight(studentId, groupId, "teacher", classification, snapshot);
   const studentInsight = upsertInsight(studentId, groupId, "student", classification, snapshot);
+  syncLowLoadInsights(studentId, groupId, classification.level, snapshot);
 
   if (classification.level === "watchlist" || classification.level === "at_risk") {
     emitNotificationIfNew(studentId, studentId, groupId, studentInsight.id, classification.level);

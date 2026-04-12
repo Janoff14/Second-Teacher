@@ -9,13 +9,21 @@ import {
   listDrafts,
   listAttemptsForStudent,
   listPublishedVersionsForGroup,
+  listStudentAttemptsInGroup,
   publishDraft,
   setDraftItems,
   submitAttempt,
   toStudentVersionView,
 } from "../domain/assessmentStore";
-import { refreshInsightsAfterAttempt } from "../domain/insightsStore";
+import {
+  refreshInsightsAfterAttempt,
+  computeRiskFeatureSnapshot,
+  classifyRiskFromSnapshot,
+  listInsightsForTeacher,
+} from "../domain/insightsStore";
+import { enrichTeacherBriefingWithOptionalLLM } from "../domain/agentOrchestrator";
 import { indexPublishedAssessmentVersion } from "../domain/ragStore";
+import { buildTeacherBriefingPayload } from "../domain/teacherBriefing";
 import { appendAuditLog } from "../domain/auditStore";
 import { getUserById } from "../domain/userStore";
 import { requireAuth, requireRole } from "../middleware/auth";
@@ -308,6 +316,170 @@ assessmentsRouter.get(
           totalAttemptCount: allResults.length,
           overallAverageScorePct,
           assessments,
+        },
+      });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+assessmentsRouter.get(
+  "/groups/:groupId/ai-briefing",
+  requireAuth,
+  requireRole(["admin", "teacher"]),
+  async (req, res, next) => {
+    try {
+      const groupId = req.params.groupId;
+      if (!groupId || Array.isArray(groupId)) {
+        throw new Error("Group id required");
+      }
+      const user = req.user!;
+      if (!canTeacherManageGroup(user.userId, user.role, groupId)) {
+        const err = new Error("Forbidden for this group") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 403;
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+      let payload = await buildTeacherBriefingPayload(groupId);
+      const enrichRaw = req.query.enrich;
+      const enrich =
+        enrichRaw === "1" ||
+        enrichRaw === "true" ||
+        (typeof enrichRaw === "string" && enrichRaw.toLowerCase() === "yes");
+      if (enrich) {
+        payload = await enrichTeacherBriefingWithOptionalLLM(payload);
+      }
+      res.status(200).json({ data: payload });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+assessmentsRouter.get(
+  "/groups/:groupId/students/:studentId/profile",
+  requireAuth,
+  requireRole(["admin", "teacher"]),
+  async (req, res, next) => {
+    try {
+      const groupId = req.params.groupId as string;
+      const studentId = req.params.studentId as string;
+      if (!groupId || !studentId) throw new Error("groupId and studentId required");
+      const user = req.user!;
+      if (!canTeacherManageGroup(user.userId, user.role, groupId)) {
+        const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 403;
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+
+      const student = await getUserById(studentId);
+      const snapshot = computeRiskFeatureSnapshot(studentId, groupId);
+      const classification = classifyRiskFromSnapshot(snapshot);
+
+      const rows = listStudentAttemptsInGroup(studentId, groupId);
+      const versions = listPublishedVersionsForGroup(groupId);
+      const versionMap = new Map(versions.map((v) => [v.id, v]));
+
+      const attempts = rows.map((r) => {
+        const v = versionMap.get(r.versionId);
+        const scorePct =
+          r.attempt.maxScore > 0
+            ? Math.round((r.attempt.totalScore / r.attempt.maxScore) * 1000) / 10
+            : 0;
+        return {
+          attemptId: r.attempt.id,
+          versionId: r.versionId,
+          assessmentTitle: v?.title ?? "Unknown",
+          assessmentType: v ? inferAssessmentType(v.title) : "assessment",
+          submittedAt: r.attempt.submittedAt,
+          totalScore: r.attempt.totalScore,
+          maxScore: r.attempt.maxScore,
+          scorePct,
+        };
+      });
+
+      const perAssessment = versions.map((v) => {
+        const studentAttempts = rows
+          .filter((r) => r.versionId === v.id)
+          .map((r) => ({
+            attemptId: r.attempt.id,
+            submittedAt: r.attempt.submittedAt,
+            totalScore: r.attempt.totalScore,
+            maxScore: r.attempt.maxScore,
+            scorePct:
+              r.attempt.maxScore > 0
+                ? Math.round((r.attempt.totalScore / r.attempt.maxScore) * 1000) / 10
+                : 0,
+          }));
+        const allVersionAttempts = listAttemptsForVersion(v.id);
+        const classAvg =
+          allVersionAttempts.length > 0
+            ? Math.round(
+                (allVersionAttempts.reduce(
+                  (s, a) => s + (a.maxScore > 0 ? a.totalScore / a.maxScore : 0),
+                  0,
+                ) /
+                  allVersionAttempts.length) *
+                  1000,
+              ) / 10
+            : null;
+        return {
+          versionId: v.id,
+          title: v.title,
+          type: inferAssessmentType(v.title),
+          itemCount: v.items.length,
+          classAveragePct: classAvg,
+          studentAttempts,
+          bestScorePct:
+            studentAttempts.length > 0
+              ? Math.max(...studentAttempts.map((a) => a.scorePct))
+              : null,
+          latestScorePct:
+            studentAttempts.length > 0
+              ? studentAttempts[studentAttempts.length - 1]!.scorePct
+              : null,
+        };
+      });
+
+      const insights = listInsightsForTeacher(groupId, { status: "all" }).filter(
+        (i) => i.studentId === studentId,
+      );
+
+      res.status(200).json({
+        data: {
+          studentId,
+          displayName: student?.displayName ?? null,
+          email: student?.email ?? null,
+          riskLevel: classification.level,
+          riskConfidence: classification.confidence,
+          riskFactors: classification.reasons,
+          features: snapshot.features,
+          totalAttempts: rows.length,
+          overallAveragePct:
+            rows.length > 0
+              ? Math.round(
+                  (rows.reduce(
+                    (s, r) =>
+                      s + (r.attempt.maxScore > 0 ? r.attempt.totalScore / r.attempt.maxScore : 0),
+                    0,
+                  ) /
+                    rows.length) *
+                    1000,
+                ) / 10
+              : null,
+          attempts,
+          perAssessment,
+          insights: insights.map((i) => ({
+            id: i.id,
+            title: i.title,
+            body: i.body,
+            riskLevel: i.riskLevel,
+            factors: i.factors,
+            status: i.status,
+            updatedAt: i.updatedAt,
+          })),
         },
       });
     } catch (e) {

@@ -22,6 +22,7 @@ import {
   type TeacherAssessmentResultSummary,
   type TeacherGroupResultsSummary,
 } from "@/lib/api/assessments";
+import { AiBriefingStrip } from "@/components/teacher/AiBriefingStrip";
 import {
   listTeacherInsights,
   recomputeGroupAnalytics,
@@ -30,6 +31,7 @@ import {
   type Insight,
 } from "@/lib/api/insights";
 import { ResultsCharts } from "@/components/teacher/ResultsCharts";
+import { generateGroupCommentary } from "@/lib/aiCommentary";
 
 type TabId = "students" | "results" | "tests";
 
@@ -81,6 +83,8 @@ function riskBadgeClasses(level: GroupStudent["riskLevel"]) {
       return "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200";
     case "watchlist":
       return "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200";
+    case "low_load":
+      return "bg-sky-100 text-sky-900 dark:bg-sky-950/50 dark:text-sky-200";
     case "stable":
       return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200";
     default:
@@ -94,10 +98,27 @@ function riskLabel(level: GroupStudent["riskLevel"]) {
       return "At risk";
     case "watchlist":
       return "Watchlist";
+    case "low_load":
+      return "Low load";
     case "stable":
       return "Stable";
     default:
       return "No signal yet";
+  }
+}
+
+function rosterAccentClass(level: GroupStudent["riskLevel"]) {
+  switch (level) {
+    case "at_risk":
+      return "border-l-red-500";
+    case "watchlist":
+      return "border-l-amber-500";
+    case "low_load":
+      return "border-l-sky-500";
+    case "stable":
+      return "border-l-emerald-500/40";
+    default:
+      return "border-l-transparent";
   }
 }
 
@@ -113,6 +134,8 @@ function insightBadgeClasses(riskLevel?: string | null) {
       return "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-200";
     case "watchlist":
       return "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200";
+    case "low_load":
+      return "bg-sky-100 text-sky-900 dark:bg-sky-950/50 dark:text-sky-200";
     case "stable":
       return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200";
     default:
@@ -164,6 +187,7 @@ export default function TeacherGroupWorkspacePage() {
   const [drafts, setDrafts] = useState<AssessmentDraft[]>([]);
   const [published, setPublished] = useState<PublishedAssessment[]>([]);
   const [testMakerLoading, setTestMakerLoading] = useState(false);
+  const [rosterAiOpen, setRosterAiOpen] = useState<Record<string, boolean>>({});
 
   const resolveMeta = useCallback(async () => {
     setMetaLoading(true);
@@ -303,6 +327,11 @@ export default function TeacherGroupWorkspacePage() {
       });
   }, [resultsSummary]);
 
+  const groupCommentary = useMemo(() => {
+    if (!resultsSummary) return [];
+    return generateGroupCommentary(resultsSummary, insights);
+  }, [resultsSummary, insights]);
+
   const studentNameMap = useMemo(() => {
     const map = new Map<string, string>();
     for (const s of students) {
@@ -312,11 +341,16 @@ export default function TeacherGroupWorkspacePage() {
   }, [students]);
 
   const topRiskStudents = useMemo(() => {
+    const priority = (level: GroupStudent["riskLevel"]) => {
+      if (level === "at_risk") return 0;
+      if (level === "watchlist") return 1;
+      if (level === "low_load") return 2;
+      return 3;
+    };
     return [...students]
       .sort((left, right) => {
-        const leftPriority = left.riskLevel === "at_risk" ? 0 : left.riskLevel === "watchlist" ? 1 : 2;
-        const rightPriority =
-          right.riskLevel === "at_risk" ? 0 : right.riskLevel === "watchlist" ? 1 : 2;
+        const leftPriority = priority(left.riskLevel);
+        const rightPriority = priority(right.riskLevel);
         if (leftPriority !== rightPriority) return leftPriority - rightPriority;
         return (right.attemptCount ?? 0) - (left.attemptCount ?? 0);
       })
@@ -439,6 +473,13 @@ export default function TeacherGroupWorkspacePage() {
 
       <ErrorBox message={error} />
 
+      <AiBriefingStrip
+        groupId={groupId}
+        onInsightAcknowledged={() => {
+          void Promise.all([loadStudents(), loadInsights()]);
+        }}
+      />
+
       <div className="flex flex-wrap gap-2">
         {tabs.map((entry) => (
           <button
@@ -459,7 +500,7 @@ export default function TeacherGroupWorkspacePage() {
 
       {tab === "students" ? (
         <section className="space-y-6">
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <SummaryCard
               label="Students"
               value={String(students.length)}
@@ -474,6 +515,11 @@ export default function TeacherGroupWorkspacePage() {
               label="Watchlist"
               value={String(students.filter((student) => student.riskLevel === "watchlist").length)}
               hint="Keep an eye on the trend"
+            />
+            <SummaryCard
+              label="Low load"
+              value={String(students.filter((student) => student.riskLevel === "low_load").length)}
+              hint="Strong work — room for stretch goals"
             />
           </div>
 
@@ -543,57 +589,92 @@ export default function TeacherGroupWorkspacePage() {
               </div>
             ) : (
               <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {students.map((student) => (
-                  <article
-                    key={student.studentId}
-                    className="rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/40"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-1">
-                        <p className="font-medium text-neutral-900 dark:text-neutral-100">
-                          {student.displayName || student.studentId}
-                        </p>
-                        <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                          {student.email || student.studentId}
-                        </p>
-                      </div>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${riskBadgeClasses(student.riskLevel)}`}>
-                        {riskLabel(student.riskLevel)}
-                      </span>
-                    </div>
+                {students.map((student) => {
+                  const expanded = rosterAiOpen[student.studentId] ?? false;
+                  return (
+                    <article
+                      key={student.studentId}
+                      className={`rounded-2xl border border-neutral-200 border-l-4 bg-neutral-50/80 p-4 dark:border-neutral-800 dark:bg-neutral-900/40 ${rosterAccentClass(student.riskLevel)}`}
+                    >
+                      <div className="flex gap-2">
+                        <Link
+                          href={`/teacher/groups/${encodeURIComponent(groupId)}/students/${encodeURIComponent(student.studentId)}`}
+                          className="group min-w-0 flex-1 rounded-xl outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-blue-500"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="space-y-1">
+                              <p className="font-medium text-neutral-900 group-hover:text-blue-700 dark:text-neutral-100 dark:group-hover:text-blue-300">
+                                {student.displayName || student.studentId}
+                              </p>
+                              <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                                {student.email || student.studentId}
+                              </p>
+                            </div>
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-xs font-medium ${riskBadgeClasses(student.riskLevel)}`}
+                            >
+                              {riskLabel(student.riskLevel)}
+                            </span>
+                          </div>
 
-                    <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <dt className="text-neutral-500 dark:text-neutral-400">Attempts</dt>
-                        <dd className="mt-1 font-medium text-neutral-900 dark:text-neutral-100">
-                          {student.attemptCount ?? 0}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-neutral-500 dark:text-neutral-400">Latest score</dt>
-                        <dd className="mt-1 font-medium text-neutral-900 dark:text-neutral-100">
-                          {formatPct(student.latestScorePct)}
-                        </dd>
-                      </div>
-                      <div className="col-span-2">
-                        <dt className="text-neutral-500 dark:text-neutral-400">Last activity</dt>
-                        <dd className="mt-1 text-neutral-900 dark:text-neutral-100">
-                          {formatDateTime(student.lastAttemptAt || student.enrolledAt)}
-                        </dd>
-                      </div>
-                    </dl>
+                          <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <dt className="text-neutral-500 dark:text-neutral-400">Attempts</dt>
+                              <dd className="mt-1 font-medium text-neutral-900 dark:text-neutral-100">
+                                {student.attemptCount ?? 0}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-neutral-500 dark:text-neutral-400">Latest score</dt>
+                              <dd className="mt-1 font-medium text-neutral-900 dark:text-neutral-100">
+                                {formatPct(student.latestScorePct)}
+                              </dd>
+                            </div>
+                            <div className="col-span-2">
+                              <dt className="text-neutral-500 dark:text-neutral-400">Last activity</dt>
+                              <dd className="mt-1 text-neutral-900 dark:text-neutral-100">
+                                {formatDateTime(student.lastAttemptAt || student.enrolledAt)}
+                              </dd>
+                            </div>
+                          </dl>
 
-                    {student.riskReason ? (
-                      <p className="mt-4 text-sm leading-6 text-neutral-700 dark:text-neutral-300">
-                        {student.riskReason}
-                      </p>
-                    ) : (
-                      <p className="mt-4 text-sm leading-6 text-neutral-500 dark:text-neutral-400">
-                        This student does not have a specific risk explanation yet.
-                      </p>
-                    )}
-                  </article>
-                ))}
+                          {!expanded && student.riskReason ? (
+                            <p className="mt-4 line-clamp-2 text-sm leading-6 text-neutral-700 dark:text-neutral-300">
+                              {student.riskReason}
+                            </p>
+                          ) : null}
+                          <p className="mt-2 text-xs font-medium text-blue-600 opacity-0 transition-opacity group-hover:opacity-100 dark:text-blue-400">
+                            View full profile →
+                          </p>
+                        </Link>
+                        <button
+                          type="button"
+                          aria-expanded={expanded}
+                          onClick={() =>
+                            setRosterAiOpen((prev) => ({
+                              ...prev,
+                              [student.studentId]: !prev[student.studentId],
+                            }))
+                          }
+                          className="h-fit shrink-0 rounded-lg border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-white dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                        >
+                          {expanded ? "Hide" : "AI"}
+                        </button>
+                      </div>
+                      {expanded ? (
+                        <div className="mt-4 border-t border-neutral-200 pt-3 text-sm dark:border-neutral-700">
+                          <p className="font-medium text-neutral-900 dark:text-neutral-100">AI annotation</p>
+                          <p className="mt-2 text-neutral-700 dark:text-neutral-300">
+                            {student.riskReason || "No extra detail for this student yet."}
+                          </p>
+                          <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
+                            Open the full profile for charts, factors, and suggested follow-ups tied to insight cards.
+                          </p>
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -644,8 +725,24 @@ export default function TeacherGroupWorkspacePage() {
             />
           </div>
 
+          {groupCommentary.length > 0 && (
+            <section className="rounded-2xl border border-blue-200/70 bg-gradient-to-b from-blue-50/80 to-white p-5 shadow-sm dark:border-blue-900/40 dark:from-blue-950/30 dark:to-neutral-950/80">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📊</span>
+                <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-50">AI Summary</h2>
+              </div>
+              <ul className="mt-3 space-y-1.5">
+                {groupCommentary.map((line, i) => (
+                  <li key={i} className="text-sm leading-relaxed text-neutral-700 dark:text-neutral-300">
+                    {line}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {resultsSummary ? (
-            <ResultsCharts summary={resultsSummary} insights={insights} />
+                       <ResultsCharts summary={resultsSummary} insights={insights} />
           ) : null}
 
           <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">

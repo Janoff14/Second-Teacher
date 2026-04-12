@@ -23,17 +23,17 @@ import type {
 } from "@/lib/api/assessments";
 
 type InsightEntry = {
-  id: string;
+  id?: string;
   enrollmentId?: string;
-  groupId?: string;
-  studentId?: string;
+  groupId?: string | null;
+  studentId?: string | null;
   type?: string;
-  severity?: string;
-  riskLevel?: string;
-  title?: string;
-  message?: string;
-  body?: string;
-  summary?: string;
+  severity?: string | null;
+  riskLevel?: string | null;
+  title?: string | null;
+  message?: string | null;
+  body?: string | null;
+  summary?: string | null;
 };
 
 type Props = {
@@ -162,17 +162,19 @@ export function ResultsCharts({ summary, insights }: Props) {
     const counts: Record<string, number> = {
       at_risk: 0,
       watchlist: 0,
+      low_load: 0,
       stable: 0,
     };
     for (const ins of insights) {
       const level = ins.riskLevel ?? ins.severity ?? "";
       if (level in counts) counts[level]++;
     }
-    const total = counts.at_risk + counts.watchlist + counts.stable;
+    const total = counts.at_risk + counts.watchlist + counts.low_load + counts.stable;
     if (total === 0) return [];
     return [
       { name: "At Risk", value: counts.at_risk, color: PALETTE.red },
       { name: "Watchlist", value: counts.watchlist, color: PALETTE.yellow },
+      { name: "Low load", value: counts.low_load, color: "#0ea5e9" },
       { name: "Stable", value: counts.stable, color: PALETTE.green },
     ].filter((d) => d.value > 0);
   }, [insights]);
@@ -232,7 +234,10 @@ export function ResultsCharts({ summary, insights }: Props) {
               <YAxis dataKey="name" type="category" width={140} tick={AXIS_TICK} />
               <Tooltip
                 {...TOOLTIP_STYLE}
-                formatter={(v: number) => [`${v}%`, "Avg Score"]}
+                formatter={(v) => [
+                  `${typeof v === "number" && !Number.isNaN(v) ? v : 0}%`,
+                  "Avg Score",
+                ]}
               />
               <Bar dataKey="avg" radius={[0, 4, 4, 0]}>
                 {perfData.map((entry, i) => (
@@ -259,7 +264,10 @@ export function ResultsCharts({ summary, insights }: Props) {
               <YAxis domain={[0, 100]} tick={AXIS_TICK} />
               <Tooltip
                 {...TOOLTIP_STYLE}
-                formatter={(v: number) => [`${v}%`, "Class Avg"]}
+                formatter={(v) => [
+                  `${typeof v === "number" && !Number.isNaN(v) ? v : 0}%`,
+                  "Class Avg",
+                ]}
               />
               <ReferenceLine
                 y={60}
@@ -306,7 +314,7 @@ export function ResultsCharts({ summary, insights }: Props) {
                   dataKey="value"
                   nameKey="name"
                   label={({ name, value, percent }) =>
-                    `${name}: ${value} (${(percent * 100).toFixed(0)}%)`
+                    `${name}: ${value} (${((percent ?? 0) * 100).toFixed(0)}%)`
                   }
                 >
                   {riskData.map((entry, i) => (
@@ -340,7 +348,10 @@ export function ResultsCharts({ summary, insights }: Props) {
               <YAxis domain={[0, 100]} tick={AXIS_TICK} />
               <Tooltip
                 {...TOOLTIP_STYLE}
-                formatter={(v: number) => [`${v}%`, "Participation"]}
+                formatter={(v) => [
+                  `${typeof v === "number" && !Number.isNaN(v) ? v : 0}%`,
+                  "Participation",
+                ]}
               />
               <Bar
                 dataKey="rate"

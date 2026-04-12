@@ -11,8 +11,39 @@ export type StudentAgentBody = {
   groupId: string;
 };
 
+export type BriefingQueryCard =
+  | { kind: "note"; title?: string; body: string }
+  | {
+      kind: "insight_row";
+      studentId: string;
+      title: string;
+      riskLevel: string;
+      factors: string[];
+    }
+  | { kind: "corpus_row"; anchor: string; excerpt: string }
+  | {
+      kind: "pattern";
+      patternType: string;
+      description: string;
+      suggestedAction: string;
+      studentCount: number;
+    };
+
+export type TeacherBriefingQueryResult = {
+  cards: BriefingQueryCard[];
+  citations: Array<{ sourceType?: string; anchor?: string; [key: string]: unknown }>;
+  fallback: boolean;
+};
+
 export async function teacherAgentChat(body: TeacherAgentBody) {
   return apiRequest<unknown>("/agent/teacher/chat", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function teacherBriefingQuery(body: TeacherAgentBody) {
+  return apiRequest<TeacherBriefingQueryResult>("/agent/teacher/briefing-query", {
     method: "POST",
     body: JSON.stringify(body),
   });

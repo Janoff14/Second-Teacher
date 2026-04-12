@@ -100,7 +100,7 @@ export type GroupStudent = {
   attemptCount?: number;
   lastAttemptAt?: string | null;
   latestScorePct?: number | null;
-  riskLevel?: "stable" | "watchlist" | "at_risk" | null;
+  riskLevel?: "stable" | "watchlist" | "at_risk" | "low_load" | null;
   riskReason?: string | null;
 };
 

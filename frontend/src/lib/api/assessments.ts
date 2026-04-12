@@ -277,6 +277,115 @@ export async function getTeacherGroupResultsSummary(groupId: string) {
   });
 }
 
+export type RiskFactorEvidence = {
+  code: string;
+  message: string;
+  severity: "info" | "warning" | "critical";
+};
+
+export type TeacherBriefingGroupPattern = {
+  patternType: string;
+  description: string;
+  affectedStudentIds: string[];
+  suggestedAction: string;
+  versionId?: string;
+};
+
+export type TeacherBriefingStudent = {
+  studentId: string;
+  displayName: string | null;
+  insightId: string;
+  riskLevel: string;
+  insightType: string;
+  recentScores: number[];
+  reasoning: string;
+  suggestedActions: string[];
+  factors: RiskFactorEvidence[];
+  status: string;
+};
+
+export type TeacherBriefing = {
+  attentionNeeded: number;
+  students: TeacherBriefingStudent[];
+  groupPatterns: TeacherBriefingGroupPattern[];
+};
+
+export async function getTeacherAiBriefing(groupId: string, enrich = false) {
+  const q = enrich ? "?enrich=1" : "";
+  return apiRequest<TeacherBriefing>(`/groups/${groupId}/ai-briefing${q}`, {
+    method: "GET",
+  });
+}
+
+export type StudentProfileAttempt = {
+  attemptId: string;
+  versionId: string;
+  assessmentTitle: string;
+  assessmentType: string;
+  submittedAt: string;
+  totalScore: number;
+  maxScore: number;
+  scorePct: number;
+};
+
+export type StudentProfileAssessment = {
+  versionId: string;
+  title: string;
+  type: string;
+  itemCount: number;
+  classAveragePct: number | null;
+  bestScorePct: number | null;
+  latestScorePct: number | null;
+  studentAttempts: Array<{
+    attemptId: string;
+    submittedAt: string;
+    totalScore: number;
+    maxScore: number;
+    scorePct: number;
+  }>;
+};
+
+export type StudentProfile = {
+  studentId: string;
+  displayName: string | null;
+  email: string | null;
+  riskLevel: string;
+  riskConfidence: number;
+  riskFactors: RiskFactorEvidence[];
+  features: {
+    attemptCount: number;
+    attemptsLast14Days: number;
+    daysSinceLastAttempt: number | null;
+    recentAvgRatio: number | null;
+    priorAvgRatio: number | null;
+    trendDelta: number | null;
+    trendLabel: string;
+    lowScoreCountInLast5: number;
+    classAvgRatioSample: number | null;
+    baselineDeviation: number | null;
+  };
+  totalAttempts: number;
+  overallAveragePct: number | null;
+  attempts: StudentProfileAttempt[];
+  perAssessment: StudentProfileAssessment[];
+  insights: Array<{
+    id: string;
+    title: string;
+    body: string;
+    riskLevel: string;
+    factors: RiskFactorEvidence[];
+    status: string;
+    updatedAt: string;
+  }>;
+};
+
+export async function getStudentProfile(groupId: string, studentId: string) {
+  return apiRequest<StudentProfile>(
+    `/groups/${groupId}/students/${studentId}/profile`,
+    { method: "GET" },
+  );
+}
+
 /** Unwrap list from various envelope shapes. */
 export function unwrapDraftList(data: unknown): AssessmentDraft[] {
   return asArray<AssessmentDraft>(data);
