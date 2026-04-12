@@ -108,7 +108,7 @@ export default function JoinPage() {
 
       <div className="relative w-full max-w-md animate-fade-in">
         <div className="h-1.5 rounded-t-3xl bg-gradient-to-r from-accent-500 to-cyan-500" />
-        <div className="rounded-b-3xl border border-foreground/10 bg-white/80 px-8 py-10 shadow-card backdrop-blur dark:bg-foreground/[0.06]">
+        <div className="rounded-b-3xl border border-foreground/10 bg-white/80 px-8 py-10 shadow-card backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
           <Link href="/" className="text-lg font-bold tracking-tight text-foreground">
             Second<span className="text-gradient-brand">Teacher</span>
           </Link>

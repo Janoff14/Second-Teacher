@@ -13,9 +13,18 @@ import { validateBody } from "../middleware/validate";
 
 export const agentRouter = Router();
 
+const pageContextSchema = z.object({
+  page: z.string().max(100).optional(),
+  studentId: z.string().max(200).optional(),
+  studentName: z.string().max(200).optional(),
+  tab: z.string().max(100).optional(),
+  assessmentId: z.string().max(200).optional(),
+}).optional();
+
 const chatSchema = z.object({
   message: z.string().min(1).max(8000),
   groupId: z.string().min(1),
+  pageContext: pageContextSchema,
 });
 
 function resolveAgentTimeoutMs(req: { header(name: string): string | undefined }): number {
@@ -52,6 +61,7 @@ agentRouter.post(
         groupId: body.groupId,
         message: body.message,
         timeoutMs,
+        ...(body.pageContext !== undefined ? { pageContext: body.pageContext } : {}),
         ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
       });
       appendAuditLog({
@@ -93,6 +103,7 @@ agentRouter.post(
         groupId: body.groupId,
         message: body.message,
         timeoutMs,
+        ...(body.pageContext !== undefined ? { pageContext: body.pageContext } : {}),
         ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
       });
       appendAuditLog({
@@ -135,6 +146,7 @@ agentRouter.post(
         groupId: body.groupId,
         message: body.message,
         timeoutMs,
+        ...(body.pageContext !== undefined ? { pageContext: body.pageContext } : {}),
         ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
       });
       appendAuditLog({

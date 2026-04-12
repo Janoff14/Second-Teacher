@@ -12,6 +12,16 @@ import { detectGroupPatterns } from "./teacherBriefing";
 import { briefCompletion, hasOpenAI } from "../lib/openai";
 import type { TeacherBriefingPayload } from "./teacherBriefing";
 
+export type PageContext = {
+  page?: string | undefined;
+  studentId?: string | undefined;
+  studentName?: string | undefined;
+  tab?: string | undefined;
+  assessmentId?: string | undefined;
+};
+
+const MIN_RAG_SCORE = 0.25;
+
 export type AgentToolRun = {
   name: string;
   ok: boolean;
@@ -79,36 +89,50 @@ async function raceTimeout<T>(work: () => Promise<T>, ms: number): Promise<T> {
   });
 }
 
-function buildTeacherReply(message: string, insights: InsightRecord[], hits: RetrievalHit[]): string {
+function buildTeacherReply(message: string, insights: InsightRecord[], hits: RetrievalHit[], ctx?: PageContext): string {
   const lines: string[] = [];
-  lines.push("Here is what I found using scoped class tools (not a free-form model reply).");
+  const focusStudent = ctx?.studentId;
+
+  if (focusStudent) {
+    const name = ctx?.studentName ?? focusStudent;
+    lines.push(`**Context:** Viewing student profile for **${name}**.`);
+  } else if (ctx?.page) {
+    lines.push(`**Context:** ${ctx.page.replace(/-/g, " ")}${ctx.tab ? ` (${ctx.tab} tab)` : ""}.`);
+  }
   lines.push("");
+
   if (insights.length > 0) {
-    lines.push("**Insights (teacher view)**");
-    for (const ins of insights.slice(0, 8)) {
+    lines.push(focusStudent ? "**Insights for this student**" : "**Insights (teacher view)**");
+    for (const ins of insights.slice(0, 6)) {
       const sev = ins.riskLevel.replace("_", " ");
-      lines.push(`- Student ${ins.studentId}: ${sev} — ${ins.title}. Factors: ${ins.factors.map((f) => f.message).join(" ")}`);
+      if (focusStudent) {
+        lines.push(`- ${sev} — ${ins.title}. ${ins.factors.map((f) => f.message).join(" ")}`);
+      } else {
+        lines.push(`- Student ${ins.studentId}: ${sev} — ${ins.title}. ${ins.factors.map((f) => f.message).join(" ")}`);
+      }
     }
     lines.push("");
     lines.push(
-      "**Recommendation:** Prioritize follow-up for watchlist/at-risk rows; open the insights board to acknowledge or dismiss items as you act.",
+      focusStudent
+        ? "**Recommendation:** Review the factors above and check the student's trend chart for recent changes."
+        : "**Recommendation:** Prioritize follow-up for watchlist/at-risk rows; open the insights board to acknowledge or dismiss items as you act.",
     );
   } else {
-    lines.push("No open insight cards for this group right now.");
+    lines.push(
+      focusStudent
+        ? "No open insight cards for this student right now."
+        : "No open insight cards for this group right now.",
+    );
   }
-  lines.push("");
+
   if (hits.length > 0) {
-    lines.push("**Course corpus (top matches)**");
-    for (const h of hits.slice(0, 5)) {
+    lines.push("");
+    lines.push("**Relevant course material**");
+    for (const h of hits.slice(0, 3)) {
       lines.push(`- (${h.citation.sourceType}) ${h.citation.anchor}: ${h.text.slice(0, 160)}${h.text.length > 160 ? "…" : ""}`);
     }
-    lines.push("");
-    lines.push("Use the citation anchors when citing material to students or in feedback.");
-  } else {
-    lines.push("No strong corpus matches for this prompt; consider broadening keywords or ingesting more sources.");
   }
-  lines.push("");
-  lines.push(`_Your question was:_ ${message.slice(0, 500)}${message.length > 500 ? "…" : ""}`);
+
   return lines.join("\n");
 }
 
@@ -131,38 +155,37 @@ function buildStudentReply(
   insights: InsightRecord[],
   hits: RetrievalHit[],
   scheduleSummary: string,
+  ctx?: PageContext,
 ): string {
   const lines: string[] = [];
-  lines.push("Here is supportive guidance based only on your enrollment and course materials.");
+  lines.push("Here is supportive guidance based on your enrollment and course materials.");
   lines.push("");
-  lines.push(
-    "**Important:** I cannot predict whether you will pass or fail any assessment. Use this as a study guide, not a grade guarantee.",
-  );
-  lines.push("");
+
   if (insights.length > 0) {
     lines.push("**Your proactive nudges**");
-    for (const ins of insights.slice(0, 5)) {
+    for (const ins of insights.slice(0, 4)) {
       lines.push(`- ${ins.title}: ${ins.factors.map((f) => f.message).join(" ")}`);
     }
     lines.push("");
   }
+
   lines.push("**Schedule context**");
   lines.push(scheduleSummary);
-  lines.push("");
+
   if (hits.length > 0) {
-    lines.push("**Material to review (with citations)**");
-    for (const h of hits.slice(0, 5)) {
+    lines.push("");
+    lines.push("**Material to review**");
+    for (const h of hits.slice(0, 3)) {
       const loc = h.citation.textbookLocation;
       const locLabel = loc?.chapterTitle
         ? `${loc.chapterTitle}${loc.pageNumber ? ` p.${loc.pageNumber}` : ""}`
         : h.citation.anchor;
       lines.push(`- **${locLabel}**: ${h.text.slice(0, 200)}${h.text.length > 200 ? "…" : ""}`);
     }
-    lines.push("");
   }
-  lines.push("**Next steps:** Re-read the cited sections, attempt practice items without fixating on scores, and ask your teacher if you are unsure about expectations.");
+
   lines.push("");
-  lines.push(`_You asked:_ ${message.slice(0, 400)}${message.length > 400 ? "…" : ""}`);
+  lines.push("**Next steps:** Re-read the cited sections and attempt practice items. Ask your teacher if you are unsure about expectations.");
   return lines.join("\n");
 }
 
@@ -252,11 +275,13 @@ export async function runTeacherBriefingQuery(params: {
   message: string;
   timeoutMs: number;
   requestId?: string;
+  pageContext?: PageContext;
 }): Promise<BriefingQueryResult> {
   const base = await runTeacherAgentChat({
     groupId: params.groupId,
     message: params.message,
     timeoutMs: params.timeoutMs,
+    ...(params.pageContext !== undefined ? { pageContext: params.pageContext } : {}),
     ...(params.requestId !== undefined ? { requestId: params.requestId } : {}),
   });
 
@@ -306,6 +331,7 @@ export async function runTeacherAgentChat(params: {
   message: string;
   timeoutMs: number;
   requestId?: string;
+  pageContext?: PageContext;
 }): Promise<AgentChatResult> {
   const group = getGroup(params.groupId);
   if (!group) {
@@ -315,25 +341,35 @@ export async function runTeacherAgentChat(params: {
     throw err;
   }
 
+  const ctx = params.pageContext;
+  const focusStudentId = ctx?.studentId;
+
   const doWork = async (): Promise<AgentChatResult> => {
     if (env.NODE_ENV === "test" && params.message.includes("__delay300__")) {
       await new Promise((r) => setTimeout(r, 300));
     }
 
     const tools: AgentToolRun[] = [];
-    const insights = listInsightsForTeacher(params.groupId, {});
+    let allInsights = listInsightsForTeacher(params.groupId, {});
+    if (focusStudentId) {
+      const studentInsights = allInsights.filter((i) => i.studentId === focusStudentId);
+      if (studentInsights.length > 0) allInsights = studentInsights;
+    }
     tools.push({
       name: "get_insights",
       ok: true,
-      summary: `${insights.length} non-dismissed teacher insight(s)`,
-      data: insights.slice(0, 15),
+      summary: focusStudentId
+        ? `${allInsights.length} insight(s) for student ${focusStudentId}`
+        : `${allInsights.length} non-dismissed teacher insight(s)`,
+      data: allInsights.slice(0, 15),
     });
 
     const hits = await queryCorpus({
       query: params.message,
       groupId: params.groupId,
       subjectId: group.subjectId,
-      topK: 6,
+      topK: 4,
+      minScore: MIN_RAG_SCORE,
     });
     tools.push({
       name: "search_corpus",
@@ -342,7 +378,7 @@ export async function runTeacherAgentChat(params: {
       data: hits,
     });
 
-    const reply = buildTeacherReply(params.message, insights, hits);
+    const reply = buildTeacherReply(params.message, allInsights, hits, ctx);
     return {
       reply,
       tools,
@@ -377,6 +413,7 @@ export async function runStudentAgentChat(params: {
   message: string;
   timeoutMs: number;
   requestId?: string;
+  pageContext?: PageContext;
 }): Promise<StudentAgentStructuredResult> {
   const group = getGroup(params.groupId);
   if (!group) {
@@ -425,7 +462,8 @@ export async function runStudentAgentChat(params: {
       query: params.message,
       groupId: params.groupId,
       subjectId: group.subjectId,
-      topK: 6,
+      topK: 4,
+      minScore: MIN_RAG_SCORE,
     });
     tools.push({
       name: "search_corpus",
@@ -442,7 +480,7 @@ export async function runStudentAgentChat(params: {
       link: `/student/assessments/take/${v.id}`,
     }));
 
-    const reply = buildStudentReply(params.message, insights, hits, scheduleSummary);
+    const reply = buildStudentReply(params.message, insights, hits, scheduleSummary, params.pageContext);
     return {
       reply,
       tools,

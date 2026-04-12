@@ -13,6 +13,8 @@ export type AppNotification = {
   riskLevel?: string | null;
   groupId?: string | null;
   subjectName?: string | null;
+  studentId?: string | null;
+  studentName?: string | null;
 };
 
 export function unwrapNotificationList(data: unknown): AppNotification[] {
@@ -42,5 +44,12 @@ export async function listMyNotifications(limit?: number) {
   return apiRequest<unknown>(
     `/notifications/me${qs ? `?${qs}` : ""}`,
     { method: "GET" },
+  );
+}
+
+export async function markNotificationRead(notificationId: string) {
+  return apiRequest<unknown>(
+    `/notifications/${encodeURIComponent(notificationId)}/read`,
+    { method: "PATCH" },
   );
 }

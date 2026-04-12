@@ -32,6 +32,8 @@ import {
 } from "@/lib/api/insights";
 import { ResultsCharts } from "@/components/teacher/ResultsCharts";
 import { generateGroupCommentary } from "@/lib/aiCommentary";
+import { ChatWindow } from "@/components/chat/ChatWindow";
+import { getResolvedUserId } from "@/stores/auth-store";
 
 type TabId = "students" | "results" | "tests";
 
@@ -188,6 +190,7 @@ export default function TeacherGroupWorkspacePage() {
   const [published, setPublished] = useState<PublishedAssessment[]>([]);
   const [testMakerLoading, setTestMakerLoading] = useState(false);
   const [rosterAiOpen, setRosterAiOpen] = useState<Record<string, boolean>>({});
+  const [chatTarget, setChatTarget] = useState<GroupStudent | null>(null);
 
   const resolveMeta = useCallback(async () => {
     setMetaLoading(true);
@@ -647,19 +650,35 @@ export default function TeacherGroupWorkspacePage() {
                             View full profile →
                           </p>
                         </Link>
-                        <button
-                          type="button"
-                          aria-expanded={expanded}
-                          onClick={() =>
-                            setRosterAiOpen((prev) => ({
-                              ...prev,
-                              [student.studentId]: !prev[student.studentId],
-                            }))
-                          }
-                          className="h-fit shrink-0 rounded-lg border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-white dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-800"
-                        >
-                          {expanded ? "Hide" : "AI"}
-                        </button>
+                        <div className="flex shrink-0 flex-col gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setChatTarget(student);
+                            }}
+                            className="h-fit rounded-lg border border-brand-300 bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 dark:border-brand-700 dark:bg-brand-950/40 dark:text-brand-300 dark:hover:bg-brand-900/60"
+                            title={`Message ${student.displayName || student.studentId}`}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="inline-block h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zm-4 0H9v2h2V9z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                          <button
+                            type="button"
+                            aria-expanded={expanded}
+                            onClick={() =>
+                              setRosterAiOpen((prev) => ({
+                                ...prev,
+                                [student.studentId]: !prev[student.studentId],
+                              }))
+                            }
+                            className="h-fit rounded-lg border border-neutral-300 px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-white dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-800"
+                          >
+                            {expanded ? "Hide" : "AI"}
+                          </button>
+                        </div>
                       </div>
                       {expanded ? (
                         <div className="mt-4 border-t border-neutral-200 pt-3 text-sm dark:border-neutral-700">
@@ -926,6 +945,16 @@ export default function TeacherGroupWorkspacePage() {
           </div>
         </section>
       ) : null}
+
+      {chatTarget && (
+        <ChatWindow
+          recipientId={chatTarget.studentId}
+          recipientName={chatTarget.displayName || chatTarget.email || chatTarget.studentId}
+          riskLevel={chatTarget.riskLevel}
+          currentUserId={getResolvedUserId() || ""}
+          onClose={() => setChatTarget(null)}
+        />
+      )}
 
       {tab === "tests" ? (
         <section className="space-y-6">

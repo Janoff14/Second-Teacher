@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   teacherBriefingQuery,
   type BriefingQueryCard,
+  type PageContext,
   type TeacherBriefingQueryResult,
 } from "@/lib/api/agent";
 import { getTeacherAiBriefing } from "@/lib/api/assessments";
@@ -71,10 +72,12 @@ export function TeacherCommandPalette({
   groupId,
   open,
   onClose,
+  pageContext,
 }: {
   groupId: string | null;
   open: boolean;
   onClose: () => void;
+  pageContext?: PageContext;
 }) {
   const titleId = useId();
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -122,7 +125,7 @@ export function TeacherCommandPalette({
     }
     setSending(true);
     setError(null);
-    const res = await teacherBriefingQuery({ message: text, groupId });
+    const res = await teacherBriefingQuery({ message: text, groupId, pageContext });
     setSending(false);
     if (!res.ok) {
       setError(res.error.message);

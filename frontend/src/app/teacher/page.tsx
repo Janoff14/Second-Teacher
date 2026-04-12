@@ -68,7 +68,7 @@ export default function TeacherDashboardPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <section className="rounded-4xl border border-brand-100/50 bg-gradient-to-br from-brand-50/40 via-white to-violet-50/30 p-7 shadow-card dark:border-brand-900/30 dark:from-brand-950/20 dark:via-background dark:to-violet-950/10">
+      <section className="rounded-4xl border border-brand-100/50 bg-gradient-to-br from-brand-50/40 via-white to-violet-50/30 p-7 shadow-card dark:border-slate-700 dark:from-slate-900 dark:via-slate-900/90 dark:to-slate-900/80">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-brand-600 dark:text-brand-400">
@@ -126,7 +126,7 @@ export default function TeacherDashboardPage() {
           <Link
             key={subject.id}
             href={`/teacher/subjects/${encodeURIComponent(subject.id)}`}
-            className="group flex min-h-[200px] flex-col items-center justify-center gap-4 overflow-hidden rounded-3xl border border-foreground/10 bg-white px-6 py-10 text-center shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-brand-300 hover:shadow-card-hover dark:bg-foreground/[0.05] dark:hover:border-brand-700"
+            className="group flex min-h-[200px] flex-col items-center justify-center gap-4 overflow-hidden rounded-3xl border border-foreground/10 bg-white px-6 py-10 text-center shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-brand-300 hover:shadow-card-hover dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-700"
           >
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-100 to-violet-100 text-brand-600 dark:from-brand-900 dark:to-violet-900 dark:text-brand-300">
               <svg className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">

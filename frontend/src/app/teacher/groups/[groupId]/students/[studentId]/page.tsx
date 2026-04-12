@@ -23,6 +23,8 @@ import {
   type PercentileProfileData,
 } from "@/components/student/PercentileRadarChart";
 import { setInsightStatus } from "@/lib/api/insights";
+import { ChatWindow } from "@/components/chat/ChatWindow";
+import { getResolvedUserId } from "@/stores/auth-store";
 
 function ErrorBox({ message }: { message: string | null }) {
   if (!message) return null;
@@ -83,6 +85,7 @@ export default function TeacherStudentProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyInsight, setBusyInsight] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -170,9 +173,21 @@ export default function TeacherStudentProfilePage() {
           </h1>
           <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">{profile.email || profile.studentId}</p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-sm font-medium ${riskBadgeClasses(profile.riskLevel)}`}>
-          {profile.riskLevel.replace(/_/g, " ")}
-        </span>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setChatOpen(true)}
+            className="inline-flex items-center gap-2 rounded-full bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-brand-700 dark:bg-brand-500 dark:hover:bg-brand-600"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zm-4 0H9v2h2V9z" clipRule="evenodd" />
+            </svg>
+            Message student
+          </button>
+          <span className={`rounded-full px-3 py-1 text-sm font-medium ${riskBadgeClasses(profile.riskLevel)}`}>
+            {profile.riskLevel.replace(/_/g, " ")}
+          </span>
+        </div>
       </div>
 
       <ErrorBox message={error} />
@@ -306,6 +321,16 @@ export default function TeacherStudentProfilePage() {
           ))}
         </ul>
       </section>
+
+      {chatOpen && (
+        <ChatWindow
+          recipientId={studentId}
+          recipientName={profile.displayName || profile.email || profile.studentId}
+          riskLevel={profile.riskLevel as "stable" | "watchlist" | "at_risk" | "low_load" | null | undefined}
+          currentUserId={getResolvedUserId() || ""}
+          onClose={() => setChatOpen(false)}
+        />
+      )}
     </div>
   );
 }

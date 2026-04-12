@@ -26,7 +26,7 @@ export function DashboardWorkflowHints({ variant }: { variant: Variant }) {
       : "Talaba oqimi";
 
   return (
-    <div className="rounded-3xl border border-brand-100/60 bg-gradient-to-br from-brand-50/40 to-white p-5 shadow-card dark:border-brand-900/30 dark:from-brand-950/20 dark:to-transparent">
+    <div className="rounded-3xl border border-brand-100/60 bg-gradient-to-br from-brand-50/40 to-white p-5 shadow-card dark:border-slate-700 dark:from-slate-900 dark:to-slate-900/80">
       <p className="text-xs font-bold uppercase tracking-[0.2em] text-foreground/55">
         Platform workflow
       </p>
@@ -38,7 +38,7 @@ export function DashboardWorkflowHints({ variant }: { variant: Variant }) {
           <li key={s.href} className="contents">
             <Link
               href={s.href}
-              className="inline-flex items-center gap-1.5 rounded-full border border-brand-200/60 bg-white px-3.5 py-1.5 text-xs font-semibold text-foreground/70 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-400 hover:text-brand-600 hover:shadow-card dark:border-brand-800/40 dark:bg-brand-950/30 dark:hover:border-brand-600 dark:hover:text-brand-400"
+              className="inline-flex items-center gap-1.5 rounded-full border border-brand-200/60 bg-white px-3.5 py-1.5 text-xs font-semibold text-foreground/70 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand-400 hover:text-brand-600 hover:shadow-card dark:border-slate-600 dark:bg-slate-800 dark:hover:border-brand-600 dark:hover:text-brand-400"
             >
               <span className="flex h-4 w-4 items-center justify-center rounded-full bg-brand-100 text-[10px] font-bold text-brand-600 dark:bg-brand-900 dark:text-brand-300">
                 {i + 1}

@@ -512,8 +512,9 @@ export async function queryCorpus(params: {
   groupId: string;
   subjectId: string;
   topK: number;
+  minScore?: number;
 }): Promise<RetrievalHit[]> {
-  const { query, groupId, subjectId, topK } = params;
+  const { query, groupId, subjectId, topK, minScore } = params;
   const [qEmb] = await embed([query]);
   const scored: RetrievalHit[] = [];
 
@@ -522,6 +523,7 @@ export async function queryCorpus(params: {
       continue;
     }
     const score = cosineSimilarity(qEmb!, chunk.embedding);
+    if (minScore !== undefined && score < minScore) continue;
     const citation: RetrievalCitation = {
       anchor: chunk.citationAnchor,
       sourceType: chunk.sourceType,

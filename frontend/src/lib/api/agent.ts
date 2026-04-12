@@ -1,14 +1,23 @@
 import { apiRequest } from "./client";
 
+export type PageContext = {
+  page?: string;
+  studentId?: string;
+  studentName?: string;
+  tab?: string;
+  assessmentId?: string;
+};
+
 export type TeacherAgentBody = {
   message: string;
   groupId: string;
+  pageContext?: PageContext;
 };
 
-/** Student chat — same shape as §5.7; backend may ignore `groupId` if enrollment is implicit. */
 export type StudentAgentBody = {
   message: string;
   groupId: string;
+  pageContext?: PageContext;
 };
 
 export type BriefingQueryCard =

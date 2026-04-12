@@ -5,6 +5,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { TeacherCommandPalette } from "@/components/teacher/TeacherCommandPalette";
 import { getTeacherAiBriefing } from "@/lib/api/assessments";
+import {
+  listMyNotifications,
+  unwrapNotificationList,
+} from "@/lib/api/notifications";
+import { getUnreadCount } from "@/lib/api/messages";
 import { useAuthStore } from "@/stores/auth-store";
 import type { UserRole } from "@/stores/auth-store";
 
@@ -19,12 +24,14 @@ const adminTabs: NavItem[] = [
 
 const teacherTabs: NavItem[] = [
   { href: "/teacher", label: "Bosh panel" },
+  { href: "/messages", label: "Messages" },
   { href: "/notifications", label: "Bildirishnomalar" },
 ];
 
 const studentTabs: NavItem[] = [
   { href: "/student", label: "My subjects" },
   { href: "/join", label: "Join class" },
+  { href: "/messages", label: "Messages" },
   { href: "/notifications", label: "AI alerts" },
 ];
 
@@ -65,6 +72,8 @@ export function AppShell({
   const clearSession = useAuthStore((s) => s.clearSession);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [attentionCount, setAttentionCount] = useState<number | null>(null);
+  const [notifCount, setNotifCount] = useState(0);
+  const [msgCount, setMsgCount] = useState(0);
 
   const teacherGroupFromPath =
     section === "teacher" && pathname.startsWith("/teacher/groups/")
@@ -73,6 +82,18 @@ export function AppShell({
   const decodedTeacherGroupId = teacherGroupFromPath
     ? decodeURIComponent(teacherGroupFromPath)
     : null;
+
+  const palettePageContext = (() => {
+    if (!pathname.startsWith("/teacher/groups/")) return undefined;
+    const studentMatch = pathname.match(/\/teacher\/groups\/[^/]+\/students\/([^/]+)/);
+    if (studentMatch) {
+      return {
+        page: "teacher-student-profile" as const,
+        studentId: decodeURIComponent(studentMatch[1]!),
+      };
+    }
+    return { page: "teacher-group" as const };
+  })();
 
   const refreshAttention = useCallback(async () => {
     if (!decodedTeacherGroupId) {
@@ -88,6 +109,33 @@ export function AppShell({
   useEffect(() => {
     void refreshAttention();
   }, [refreshAttention]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function poll() {
+      const [nRes, mRes] = await Promise.allSettled([
+        listMyNotifications(50),
+        getUnreadCount(),
+      ]);
+      if (cancelled) return;
+      if (nRes.status === "fulfilled" && nRes.value.ok) {
+        const items = unwrapNotificationList(nRes.value.data);
+        setNotifCount(items.filter((n) => n.read === false).length);
+      }
+      if (mRes.status === "fulfilled" && mRes.value.ok && mRes.value.data) {
+        const raw = mRes.value.data as Record<string, unknown>;
+        setMsgCount(typeof raw.count === "number" ? raw.count : 0);
+      }
+    }
+    void poll();
+    const timer = setInterval(() => void poll(), 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
+
+  const totalBadge = notifCount + msgCount;
 
   useEffect(() => {
     if (section !== "teacher") return;
@@ -125,6 +173,7 @@ export function AppShell({
           groupId={decodedTeacherGroupId}
           open={paletteOpen}
           onClose={closePalette}
+          pageContext={palettePageContext}
         />
       ) : null}
 
@@ -139,19 +188,32 @@ export function AppShell({
               Second<span className="text-gradient-brand">Teacher</span>
             </Link>
             <nav className="flex flex-wrap gap-1 text-sm">
-              {tabs.map((tab) => (
-                <Link
-                  key={tab.href}
-                  href={tab.href}
-                  className={
-                    isActive(pathname, tab.href)
-                      ? "rounded-full bg-brand-100 px-3.5 py-1.5 font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300"
-                      : "rounded-full px-3.5 py-1.5 text-foreground/70 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-950/50 dark:hover:text-brand-400"
-                  }
-                >
-                  {tab.label}
-                </Link>
-              ))}
+              {tabs.map((tab) => {
+                const badge =
+                  tab.href === "/messages" && msgCount > 0
+                    ? msgCount
+                    : tab.href === "/notifications" && notifCount > 0
+                      ? notifCount
+                      : 0;
+                return (
+                  <Link
+                    key={tab.href}
+                    href={tab.href}
+                    className={
+                      isActive(pathname, tab.href)
+                        ? "rounded-full bg-brand-100 px-3.5 py-1.5 font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300"
+                        : "rounded-full px-3.5 py-1.5 text-foreground/70 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-950/50 dark:hover:text-brand-400"
+                    }
+                  >
+                    {tab.label}
+                    {badge > 0 && (
+                      <span className="ml-1.5 inline-flex h-4.5 min-w-[1.125rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+                        {badge > 9 ? "9+" : badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
             </nav>
           </div>
           <div className="flex items-center gap-3 text-sm">
@@ -170,6 +232,20 @@ export function AppShell({
                 ) : null}
               </button>
             ) : null}
+            <Link
+              href="/notifications"
+              className="relative rounded-full p-2 text-foreground/60 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-950/50 dark:hover:text-brand-400"
+              title="Notifications"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+              </svg>
+              {totalBadge > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-[1.125rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white dark:ring-neutral-900">
+                  {totalBadge > 9 ? "9+" : totalBadge}
+                </span>
+              )}
+            </Link>
             {role && (
               <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold capitalize text-brand-600 dark:bg-brand-950 dark:text-brand-300">
                 {role}

@@ -52,7 +52,7 @@ export default function StudentDashboardPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <section className="rounded-4xl border border-accent-100/50 bg-gradient-to-br from-accent-50/40 via-white to-cyan-50/30 p-7 shadow-card dark:border-accent-900/30 dark:from-accent-950/20 dark:via-background dark:to-cyan-950/10">
+      <section className="rounded-4xl border border-accent-100/50 bg-gradient-to-br from-accent-50/40 via-white to-cyan-50/30 p-7 shadow-card dark:border-slate-700 dark:from-slate-900 dark:via-slate-900/90 dark:to-slate-900/80">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div className="max-w-3xl">
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-accent-700 dark:text-accent-400">
@@ -65,7 +65,7 @@ export default function StudentDashboardPage() {
               Open any subject to see textbooks, practice windows, analytics, AI alerts, and a study coach that stays grounded in your course materials.
             </p>
           </div>
-          <div className="rounded-3xl border border-accent-200/50 bg-white/70 px-5 py-4 text-sm text-foreground/70 shadow-card backdrop-blur dark:border-accent-800/30 dark:bg-foreground/[0.06]">
+          <div className="rounded-3xl border border-accent-200/50 bg-white/70 px-5 py-4 text-sm text-foreground/70 shadow-card backdrop-blur dark:border-accent-800/30 dark:bg-slate-900/80">
             <p className="font-bold text-foreground">Fast demo path</p>
             <p className="mt-2 leading-relaxed">
               1. Join a class
@@ -121,7 +121,7 @@ export default function StudentDashboardPage() {
               key={item.group.id}
               href={`/student/subjects/${item.group.id}`}
               onClick={() => setActiveGroupId(item.group.id)}
-              className="group rounded-3xl border border-foreground/10 bg-white p-6 shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-accent-300 hover:shadow-card-hover dark:bg-foreground/[0.05] dark:hover:border-accent-700"
+              className="group rounded-3xl border border-foreground/10 bg-white p-6 shadow-card transition-all duration-300 hover:-translate-y-1 hover:border-accent-300 hover:shadow-card-hover dark:border-slate-700 dark:bg-slate-900 dark:hover:border-accent-700"
             >
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -136,7 +136,7 @@ export default function StudentDashboardPage() {
               </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-gradient-to-br from-accent-50/60 to-cyan-50/40 px-4 py-3 dark:from-accent-950/20 dark:to-cyan-950/10">
+                <div className="rounded-2xl bg-gradient-to-br from-accent-50/60 to-cyan-50/40 px-4 py-3 dark:from-accent-950/50 dark:to-cyan-950/30">
                   <p className="text-xs font-bold uppercase tracking-wide text-foreground/55">
                     Open now
                   </p>
@@ -144,7 +144,7 @@ export default function StudentDashboardPage() {
                     {item.summary.openNowCount}
                   </p>
                 </div>
-                <div className="rounded-2xl bg-gradient-to-br from-brand-50/60 to-violet-50/40 px-4 py-3 dark:from-brand-950/20 dark:to-violet-950/10">
+                <div className="rounded-2xl bg-gradient-to-br from-brand-50/60 to-violet-50/40 px-4 py-3 dark:from-brand-950/50 dark:to-violet-950/30">
                   <p className="text-xs font-bold uppercase tracking-wide text-foreground/55">
                     Latest score
                   </p>

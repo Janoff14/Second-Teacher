@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { parseAgentReply, studentAgentChat, type StudentAgentReading } from "@/lib/api/agent";
+import { parseAgentReply, studentAgentChat, type PageContext, type StudentAgentReading } from "@/lib/api/agent";
 import type { StudentWorkspace } from "@/lib/api/student";
 
 type CoachMessage = {
@@ -15,8 +15,10 @@ type CoachMessage = {
 
 export function StudyCoachPanel({
   workspace,
+  pageContext,
 }: {
   workspace: StudentWorkspace;
+  pageContext?: PageContext;
 }) {
   const [messages, setMessages] = useState<CoachMessage[]>([]);
   const [input, setInput] = useState("");
@@ -42,6 +44,7 @@ export function StudyCoachPanel({
     const result = await studentAgentChat({
       message: trimmed,
       groupId: workspace.group.id,
+      pageContext: pageContext ?? { page: "student-workspace" },
     });
     setLoading(false);
     if (!result.ok) {

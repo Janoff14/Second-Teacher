@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Second Teacher — Problem & Solution Flow</title>
+<style>
+  :root {
+    --red: #ef4444;
+    --red-light: #fef2f2;
+    --green: #22c55e;
+    --green-light: #f0fdf4;
+    --blue: #3b82f6;
+    --blue-light: #eff6ff;
+    --amber: #f59e0b;
+    --amber-light: #fffbeb;
+    --purple: #8b5cf6;
+    --purple-light: #f5f3ff;
+    --gray-50: #f9fafb;
+    --gray-100: #f3f4f6;
+    --gray-200: #e5e7eb;
+    --gray-300: #d1d5db;
+    --gray-400: #9ca3af;
+    --gray-500: #6b7280;
+    --gray-700: #374151;
+    --gray-800: #1f2937;
+    --gray-900: #111827;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--gray-50);
+    color: var(--gray-800);
+    line-height: 1.6;
+  }
+
+  .hero {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+    color: white;
+    padding: 80px 40px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 2.8rem; font-weight: 800; margin-bottom: 16px; letter-spacing: -1px; }
+  .hero p { font-size: 1.25rem; opacity: 0.85; max-width: 700px; margin: 0 auto; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── Stats bar ── */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin: -40px auto 60px;
+    max-width: 1000px;
+    padding: 0 24px;
+    position: relative;
+    z-index: 2;
+  }
+  .stat-card {
+    background: white;
+    border-radius: 16px;
+    padding: 28px 24px;
+    text-align: center;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  }
+  .stat-card .number { font-size: 2.4rem; font-weight: 800; }
+  .stat-card .label { font-size: 0.9rem; color: var(--gray-500); margin-top: 4px; }
+  .stat-card.red .number { color: var(--red); }
+  .stat-card.green .number { color: var(--green); }
+  .stat-card.blue .number { color: var(--blue); }
+  .stat-card.purple .number { color: var(--purple); }
+
+  /* ── Section ── */
+  .section { padding: 60px 0; }
+  .section-title {
+    text-align: center;
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+  .section-sub {
+    text-align: center;
+    color: var(--gray-500);
+    margin-bottom: 48px;
+    font-size: 1.05rem;
+  }
+
+  /* ── Comparison lanes ── */
+  .comparison {
+    display: grid;
+    grid-template-columns: 1fr 60px 1fr;
+    gap: 0;
+    align-items: start;
+    margin-bottom: 60px;
+  }
+  .lane { position: relative; }
+  .lane-header {
+    font-size: 1rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 12px 20px;
+    border-radius: 12px 12px 0 0;
+    text-align: center;
+  }
+  .lane.before .lane-header { background: var(--red-light); color: var(--red); }
+  .lane.after .lane-header  { background: var(--green-light); color: var(--green); }
+
+  .lane-body {
+    border: 2px solid var(--gray-200);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 24px 20px;
+    background: white;
+    min-height: 400px;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .divider::before {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 50%;
+    width: 2px;
+    background: var(--gray-200);
+  }
+  .vs-badge {
+    background: var(--gray-800);
+    color: white;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 0.85rem;
+    position: relative;
+    z-index: 1;
+    margin-top: 60px;
+  }
+
+  /* ── Steps ── */
+  .step {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--gray-100);
+  }
+  .step:last-child { border-bottom: none; }
+
+  .step-num {
+    width: 30px; height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .lane.before .step-num { background: var(--red-light); color: var(--red); }
+  .lane.after  .step-num { background: var(--green-light); color: var(--green); }
+
+  .step-content { flex: 1; }
+  .step-title { font-weight: 600; font-size: 0.95rem; }
+  .step-desc { font-size: 0.82rem; color: var(--gray-500); margin-top: 2px; }
+
+  .step.automated {
+    background: var(--green-light);
+    border-radius: 8px;
+    padding: 14px;
+    margin: 4px -8px;
+    border-bottom: none;
+  }
+  .step.automated .step-num { background: var(--green); color: white; }
+
+  .step.pain {
+    background: var(--red-light);
+    border-radius: 8px;
+    padding: 14px;
+    margin: 4px -8px;
+    border-bottom: none;
+  }
+  .step.pain .step-num { background: var(--red); color: white; }
+
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 99px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+  .badge.manual { background: var(--red-light); color: var(--red); }
+  .badge.auto   { background: var(--green-light); color: var(--green); }
+  .badge.ai     { background: var(--purple-light); color: var(--purple); }
+  .badge.pain-point { background: #fee2e2; color: #b91c1c; }
+
+  /* ── Savings strip ── */
+  .savings {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 20px;
+    background: var(--green-light);
+    border-radius: 12px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+  .savings .item { text-align: center; }
+  .savings .val { font-size: 1.6rem; font-weight: 800; color: var(--green); }
+  .savings .lbl { font-size: 0.8rem; color: var(--gray-500); }
+
+  /* ── Automation matrix ── */
+  .matrix {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    margin-bottom: 40px;
+  }
+  .matrix th {
+    background: var(--gray-800);
+    color: white;
+    padding: 14px 18px;
+    text-align: left;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .matrix td {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--gray-100);
+    font-size: 0.9rem;
+    background: white;
+  }
+  .matrix tr:last-child td { border-bottom: none; }
+  .matrix tr:hover td { background: var(--gray-50); }
+
+  .dot {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    margin-right: 8px;
+  }
+  .dot.manual { background: var(--red); }
+  .dot.auto   { background: var(--green); }
+  .dot.ai     { background: var(--purple); }
+  .dot.partial { background: var(--amber); }
+
+  /* ── Timeline ── */
+  .timeline {
+    position: relative;
+    padding: 20px 0;
+  }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 24px;
+    top: 0; bottom: 0;
+    width: 3px;
+    background: var(--gray-200);
+  }
+  .tl-item {
+    display: flex;
+    gap: 20px;
+    padding: 16px 0;
+    position: relative;
+  }
+  .tl-dot {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 3px solid;
+    background: white;
+    flex-shrink: 0;
+    margin-top: 4px;
+    position: relative;
+    left: 18px;
+    z-index: 1;
+  }
+  .tl-dot.red    { border-color: var(--red); }
+  .tl-dot.green  { border-color: var(--green); }
+  .tl-dot.blue   { border-color: var(--blue); }
+  .tl-dot.purple { border-color: var(--purple); }
+  .tl-dot.amber  { border-color: var(--amber); }
+  .tl-content { padding-left: 16px; }
+  .tl-title { font-weight: 600; font-size: 0.95rem; }
+  .tl-desc { font-size: 0.82rem; color: var(--gray-500); margin-top: 2px; }
+
+  /* ── Bottom CTA ── */
+  .bottom-banner {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+    color: white;
+    padding: 60px 40px;
+    text-align: center;
+    margin-top: 40px;
+  }
+  .bottom-banner h2 { font-size: 2rem; font-weight: 700; margin-bottom: 12px; }
+  .bottom-banner p { opacity: 0.8; max-width: 600px; margin: 0 auto; }
+
+  @media (max-width: 900px) {
+    .comparison { grid-template-columns: 1fr; gap: 20px; }
+    .divider { display: none; }
+    .hero h1 { font-size: 2rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ════════════════ HERO ════════════════ -->
+<div class="hero">
+  <h1>The Problem Second Teacher Solves</h1>
+  <p>Visualizing how many manual steps, delays, and blind spots we eliminate for teachers and students</p>
+</div>
+
+<!-- ════════════════ KEY STATS ════════════════ -->
+<div class="stats-bar">
+  <div class="stat-card red">
+    <div class="number">14</div>
+    <div class="label">Manual steps for a teacher<br>to find &amp; help a struggling student</div>
+  </div>
+  <div class="stat-card green">
+    <div class="number">3</div>
+    <div class="label">Steps with Second Teacher<br>(detect → brief → act)</div>
+  </div>
+  <div class="stat-card purple">
+    <div class="number">7</div>
+    <div class="label">AI-automated actions<br>per teaching cycle</div>
+  </div>
+  <div class="stat-card blue">
+    <div class="number">~80%</div>
+    <div class="label">Reduction in time to<br>identify at-risk students</div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ════════════════ TEACHER FLOW ════════════════ -->
+<div class="section">
+  <h2 class="section-title">Teacher: "Find & Help a Struggling Student"</h2>
+  <p class="section-sub">The core workflow teachers repeat every week — before and after Second Teacher</p>
+
+  <div class="comparison">
+    <!-- BEFORE -->
+    <div class="lane before">
+      <div class="lane-header">❌ Without Second Teacher</div>
+      <div class="lane-body">
+        <div class="step pain">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">Grade each paper manually <span class="badge manual">MANUAL</span></div>
+            <div class="step-desc">Mark 30–150 papers per class, record scores in notebook or spreadsheet</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">Enter grades into a spreadsheet <span class="badge manual">MANUAL</span></div>
+            <div class="step-desc">Transcribe from paper to Excel/Google Sheets — tedious, error-prone</div>
+          </div>
+        </div>
+        <div class="step pain">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Mentally compare scores over time <span class="badge manual">MANUAL</span></div>
+            <div class="step-desc">Scroll through weeks of data to spot declining trends</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-title">Identify which topics each student struggles with <span class="badge manual">MANUAL</span></div>
+            <div class="step-desc">Cross-reference wrong answers with curriculum topics — often skipped</div>
+          </div>
+        </div>
+        <div class="step pain">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <div class="step-title">Decide who actually needs attention <span class="badge pain-point">GUESSWORK</span></div>
+            <div class="step-desc">Gut feeling or last-test-only. No percentile, no trend, no risk model</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">6</div>
+          <div class="step-content">
+            <div class="step-title">Find relevant textbook pages for remediation <span class="badge manual">MANUAL</span></div>
+            <div class="step-desc">Flip through textbook TOC to find the right chapter and exercises</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">7</div>
+          <div class="step-content">
+            <div class="step-title">Write a personalized message to the student <span class="badge manual">MANUAL</span></div>
+            <div class="step-desc">Draft advice: "Study chapter 5, focus on X" — unique for each student</div>
+          </div>
+        </div>
+        <div class="step pain">
+          <div class="step-num">8</div>
+          <div class="step-content">
+            <div class="step-title">Repeat for every class, every week <span class="badge pain-point">BURNOUT</span></div>
+            <div class="step-desc">Multiply by 3–6 groups × 30+ students. Most teachers give up after top/bottom 5</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">9</div>
+          <div class="step-content">
+            <div class="step-title">Create practice/review assessments <span class="badge manual">MANUAL</span></div>
+            <div class="step-desc">Write new questions aligned to weak areas — hours of work</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">10</div>
+          <div class="step-content">
+            <div class="step-title">Check if intervention is working <span class="badge manual">MANUAL</span></div>
+            <div class="step-desc">Wait for next test, re-grade, re-compare… the cycle repeats</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIVIDER -->
+    <div class="divider">
+      <div class="vs-badge">VS</div>
+    </div>
+
+    <!-- AFTER -->
+    <div class="lane after">
+      <div class="lane-header">✅ With Second Teacher</div>
+      <div class="lane-body">
+        <div class="step automated">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">Publish assessment on platform <span class="badge auto">1× ACTION</span></div>
+            <div class="step-desc">Create or AI-generate an assessment → students take it digitally → auto-graded</div>
+          </div>
+        </div>
+        <div class="step automated">
+          <div class="step-num">A</div>
+          <div class="step-content">
+            <div class="step-title">Risk detection runs automatically <span class="badge ai">AI · AUTO</span></div>
+            <div class="step-desc">System computes percentiles, trend slopes, topic-level weak areas, and risk classification per student — no teacher action needed</div>
+          </div>
+        </div>
+        <div class="step automated">
+          <div class="step-num">B</div>
+          <div class="step-content">
+            <div class="step-title">Insights & notifications arrive <span class="badge ai">AI · AUTO</span></div>
+            <div class="step-desc">Proactive alerts: "Aziza dropped 15 percentile points in Algebra over 3 assessments" — teacher sees it on dashboard and in notification feed</div>
+          </div>
+        </div>
+        <div class="step automated">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">Open AI Briefing on group page <span class="badge auto">1-CLICK</span></div>
+            <div class="step-desc">AI briefing strip shows risk cards, group patterns, and priority students — all at a glance</div>
+          </div>
+        </div>
+        <div class="step automated">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Ask the Agent for specifics <span class="badge ai">AI · CHAT</span></div>
+            <div class="step-desc">"What should Aziza focus on?" → Agent searches corpus, finds exact textbook pages, cites chapter & exercises, and drafts a study plan</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-title">Send guidance to student <span class="badge auto">1-CLICK</span></div>
+            <div class="step-desc">Message the student directly from the platform with agent-suggested content and reading links</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 24px; padding: 16px; background: var(--green-light); border-radius: 10px; border: 1px solid #bbf7d0;">
+          <div style="font-weight: 700; color: var(--green); margin-bottom: 6px;">What runs in the background:</div>
+          <div style="font-size: 0.82rem; color: var(--gray-700); line-height: 1.7;">
+            ✦ Percentile ranking across the group<br>
+            ✦ Trend slope detection (improving / declining)<br>
+            ✦ Topic-level weakness mapping<br>
+            ✦ Risk classification (low / medium / high / critical)<br>
+            ✦ Group-wide pattern detection<br>
+            ✦ RAG search over approved textbooks<br>
+            ✦ Notification dedup & delivery
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="savings">
+    <div class="item"><div class="val">10 → 3</div><div class="lbl">Manual steps eliminated</div></div>
+    <div class="item"><div class="val">7</div><div class="lbl">Background automations</div></div>
+    <div class="item"><div class="val">0</div><div class="lbl">Spreadsheets needed</div></div>
+    <div class="item"><div class="val">~Instant</div><div class="lbl">Time to identify at-risk student</div></div>
+  </div>
+</div>
+
+<!-- ════════════════ STUDENT FLOW ════════════════ -->
+<div class="section">
+  <h2 class="section-title">Student: "I'm Falling Behind — What Do I Do?"</h2>
+  <p class="section-sub">How a struggling student gets help — before and after Second Teacher</p>
+
+  <div class="comparison">
+    <!-- BEFORE -->
+    <div class="lane before">
+      <div class="lane-header">❌ Without Second Teacher</div>
+      <div class="lane-body">
+        <div class="step pain">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">Get a low grade back <span class="badge pain-point">DELAYED</span></div>
+            <div class="step-desc">Might take days. Paper returned with a score — no detail on what went wrong</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">Feel confused but not sure why <span class="badge pain-point">NO INSIGHT</span></div>
+            <div class="step-desc">Only sees total score. No topic breakdown, no trend, no comparison</div>
+          </div>
+        </div>
+        <div class="step pain">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Try to figure out what to study <span class="badge manual">ALONE</span></div>
+            <div class="step-desc">Re-read the entire chapter? Guess which topics? No guidance</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-title">Wait for teacher's time <span class="badge pain-point">BOTTLENECK</span></div>
+            <div class="step-desc">Teacher has 150 students. Individual attention is scarce</div>
+          </div>
+        </div>
+        <div class="step pain">
+          <div class="step-num">5</div>
+          <div class="step-content">
+            <div class="step-title">Ask a friend or search the internet <span class="badge pain-point">UNRELIABLE</span></div>
+            <div class="step-desc">YouTube rabbit hole. Unverified explanations. Not aligned to the curriculum</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">6</div>
+          <div class="step-content">
+            <div class="step-title">Study randomly until next test <span class="badge manual">INEFFICIENT</span></div>
+            <div class="step-desc">No targeted plan. Same mistakes repeat. Confidence drops</div>
+          </div>
+        </div>
+        <div class="step pain">
+          <div class="step-num">7</div>
+          <div class="step-content">
+            <div class="step-title">By the time teacher notices, it's too late <span class="badge pain-point">TOO LATE</span></div>
+            <div class="step-desc">Weeks pass before pattern is visible. Student is already far behind</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DIVIDER -->
+    <div class="divider">
+      <div class="vs-badge">VS</div>
+    </div>
+
+    <!-- AFTER -->
+    <div class="lane after">
+      <div class="lane-header">✅ With Second Teacher</div>
+      <div class="lane-body">
+        <div class="step automated">
+          <div class="step-num">A</div>
+          <div class="step-content">
+            <div class="step-title">Instant results after assessment <span class="badge auto">AUTO</span></div>
+            <div class="step-desc">Score, topic breakdown, and per-question feedback available immediately</div>
+          </div>
+        </div>
+        <div class="step automated">
+          <div class="step-num">B</div>
+          <div class="step-content">
+            <div class="step-title">Dashboard shows risk & trends <span class="badge ai">AI · AUTO</span></div>
+            <div class="step-desc">Student sees their own analytics: progress charts, percentile, category radar, weak areas — explained in plain language</div>
+          </div>
+        </div>
+        <div class="step automated">
+          <div class="step-num">C</div>
+          <div class="step-content">
+            <div class="step-title">Proactive alerts when declining <span class="badge ai">AI · AUTO</span></div>
+            <div class="step-desc">"Your Algebra score dropped in the last 2 assessments. Here's what to review." — arrives before the student even asks</div>
+          </div>
+        </div>
+        <div class="step automated">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">Open Study Coach <span class="badge ai">AI · COACH</span></div>
+            <div class="step-desc">Study Coach suggests prompts based on risk: "Explain my trend," "Give me a 20-minute plan," "What to read before the quiz"</div>
+          </div>
+        </div>
+        <div class="step automated">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">Chat with AI Agent <span class="badge ai">AI · CITED</span></div>
+            <div class="step-desc">Agent searches the actual approved textbooks (RAG), finds the exact pages, cites them, and builds a personalized study plan — curriculum-aligned, not random internet</div>
+          </div>
+        </div>
+        <div class="step automated">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Read textbook in-app <span class="badge auto">1-CLICK</span></div>
+            <div class="step-desc">Agent links directly to the textbook reader with the right chapter open</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-content">
+            <div class="step-title">Get AI Study Report <span class="badge ai">AI · REPORT</span></div>
+            <div class="step-desc">Structured long-form plan: topic breakdown, suggested retakes, narrative of progress — a personalized tutor session</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 24px; padding: 16px; background: var(--green-light); border-radius: 10px; border: 1px solid #bbf7d0;">
+          <div style="font-weight: 700; color: var(--green); margin-bottom: 6px;">Key difference:</div>
+          <div style="font-size: 0.82rem; color: var(--gray-700); line-height: 1.7;">
+            ✦ Student doesn't need to <strong>wait</strong> for help<br>
+            ✦ Guidance is from <strong>their actual textbook</strong>, not random sources<br>
+            ✦ Coach adapts language by <strong>risk level</strong> (encouraging vs urgent)<br>
+            ✦ Teacher is simultaneously notified — <strong>two-way awareness</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="savings">
+    <div class="item"><div class="val">7 → 1</div><div class="lbl">Steps to get targeted help</div></div>
+    <div class="item"><div class="val">Days → Instant</div><div class="lbl">Time to get feedback</div></div>
+    <div class="item"><div class="val">100%</div><div class="lbl">Curriculum-aligned guidance</div></div>
+    <div class="item"><div class="val">24/7</div><div class="lbl">Study Coach availability</div></div>
+  </div>
+</div>
+
+<!-- ════════════════ AUTOMATION MATRIX ════════════════ -->
+<div class="section">
+  <h2 class="section-title">Automation Matrix</h2>
+  <p class="section-sub">Every action in the teaching cycle — who does it traditionally vs. what Second Teacher automates</p>
+
+  <table class="matrix">
+    <thead>
+      <tr>
+        <th style="width: 30%;">Action</th>
+        <th style="width: 20%;">Traditional</th>
+        <th style="width: 20%;">Second Teacher</th>
+        <th style="width: 30%;">How</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Create assessment questions</strong></td>
+        <td><span class="dot manual"></span>Teacher writes by hand</td>
+        <td><span class="dot ai"></span>AI-generated option</td>
+        <td>AI Generate from curriculum topics + textbook corpus</td>
+      </tr>
+      <tr>
+        <td><strong>Grade assessments</strong></td>
+        <td><span class="dot manual"></span>Teacher grades paper</td>
+        <td><span class="dot auto"></span>Auto-graded</td>
+        <td>Students take assessment digitally → instant scoring</td>
+      </tr>
+      <tr>
+        <td><strong>Track grades over time</strong></td>
+        <td><span class="dot manual"></span>Spreadsheet / notebook</td>
+        <td><span class="dot auto"></span>Automatic</td>
+        <td>Every result stored, trended, and visualized</td>
+      </tr>
+      <tr>
+        <td><strong>Identify declining students</strong></td>
+        <td><span class="dot manual"></span>Mental recall / gut</td>
+        <td><span class="dot ai"></span>AI risk engine</td>
+        <td>Percentile + trend slope → risk classification (low/med/high/critical)</td>
+      </tr>
+      <tr>
+        <td><strong>Understand what topics are weak</strong></td>
+        <td><span class="dot manual"></span>Cross-reference answers</td>
+        <td><span class="dot ai"></span>Auto topic mapping</td>
+        <td>Per-question category tags → category radar chart</td>
+      </tr>
+      <tr>
+        <td><strong>Spot group-wide patterns</strong></td>
+        <td><span class="dot manual"></span>Not done usually</td>
+        <td><span class="dot ai"></span>Pattern detection</td>
+        <td><code>detectGroupPatterns</code> surfaces systemic weak areas</td>
+      </tr>
+      <tr>
+        <td><strong>Alert teacher about at-risk students</strong></td>
+        <td><span class="dot manual"></span>Nobody alerts them</td>
+        <td><span class="dot auto"></span>Push notification</td>
+        <td>Insight engine → deduplicated notification feed</td>
+      </tr>
+      <tr>
+        <td><strong>Find relevant textbook content</strong></td>
+        <td><span class="dot manual"></span>Flip through TOC</td>
+        <td><span class="dot ai"></span>RAG corpus search</td>
+        <td>Semantic search over ingested textbooks with citations</td>
+      </tr>
+      <tr>
+        <td><strong>Draft study advice for student</strong></td>
+        <td><span class="dot manual"></span>Teacher writes manually</td>
+        <td><span class="dot ai"></span>Agent drafts it</td>
+        <td>Agent combines insights + corpus hits into study plan</td>
+      </tr>
+      <tr>
+        <td><strong>Student self-study guidance</strong></td>
+        <td><span class="dot manual"></span>YouTube / random search</td>
+        <td><span class="dot ai"></span>Study Coach + Report</td>
+        <td>Curriculum-aligned coach with cited textbook pages</td>
+      </tr>
+      <tr>
+        <td><strong>Monitor if intervention is working</strong></td>
+        <td><span class="dot manual"></span>Wait for next test</td>
+        <td><span class="dot auto"></span>Continuous tracking</td>
+        <td>Progress charts update after every assessment</td>
+      </tr>
+      <tr>
+        <td><strong>Communicate with student</strong></td>
+        <td><span class="dot partial"></span>In-person or phone</td>
+        <td><span class="dot auto"></span>In-platform chat</td>
+        <td>Direct messaging with context from student's profile page</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; margin-top: 16px; font-size: 0.85rem; color: var(--gray-500);">
+    <span><span class="dot manual" style="vertical-align: middle;"></span> Manual / teacher does it</span>
+    <span><span class="dot auto" style="vertical-align: middle;"></span> Fully automated</span>
+    <span><span class="dot ai" style="vertical-align: middle;"></span> AI-powered</span>
+    <span><span class="dot partial" style="vertical-align: middle;"></span> Partially available</span>
+  </div>
+</div>
+
+<!-- ════════════════ TIME-TO-INTERVENTION TIMELINE ════════════════ -->
+<div class="section">
+  <h2 class="section-title">Time to Intervention: A Real Scenario</h2>
+  <p class="section-sub">"Aziza's math scores have been declining for 3 weeks"</p>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; max-width: 1000px; margin: 0 auto;">
+    <!-- Traditional -->
+    <div>
+      <h3 style="color: var(--red); font-size: 1.1rem; margin-bottom: 16px;">❌ Traditional Timeline</h3>
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-dot red"></div>
+          <div class="tl-content">
+            <div class="tl-title">Week 1 — Score drops</div>
+            <div class="tl-desc">Teacher grades paper, writes score. "Maybe just a bad day."</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot red"></div>
+          <div class="tl-content">
+            <div class="tl-title">Week 2 — Another low score</div>
+            <div class="tl-desc">Teacher busy with 5 other classes. Doesn't cross-reference.</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot red"></div>
+          <div class="tl-content">
+            <div class="tl-title">Week 3 — Pattern becomes obvious</div>
+            <div class="tl-desc">Teacher finally notices. Tries to remember which topics were weak.</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot red"></div>
+          <div class="tl-content">
+            <div class="tl-title">Week 4 — Intervention starts</div>
+            <div class="tl-desc">Teacher talks to Aziza. Says "study more." Generic advice.</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot red"></div>
+          <div class="tl-content">
+            <div class="tl-title">Week 5+ — Maybe improvement</div>
+            <div class="tl-desc">Aziza is now 4–5 weeks behind. Catching up is hard.</div>
+          </div>
+        </div>
+      </div>
+      <div style="background: var(--red-light); padding: 14px; border-radius: 10px; margin-top: 12px; text-align: center;">
+        <div style="font-weight: 700; color: var(--red); font-size: 1.3rem;">4+ weeks</div>
+        <div style="font-size: 0.82rem; color: var(--gray-500);">until teacher acts on the pattern</div>
+      </div>
+    </div>
+
+    <!-- Second Teacher -->
+    <div>
+      <h3 style="color: var(--green); font-size: 1.1rem; margin-bottom: 16px;">✅ Second Teacher Timeline</h3>
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-dot green"></div>
+          <div class="tl-content">
+            <div class="tl-title">Assessment completed</div>
+            <div class="tl-desc">Auto-graded. Analytics engine runs. Risk updated.</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot purple"></div>
+          <div class="tl-content">
+            <div class="tl-title">Insight generated (minutes later)</div>
+            <div class="tl-desc">"Aziza dropped 15 percentile points. Weak in: Quadratic Equations, Factoring."</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot blue"></div>
+          <div class="tl-content">
+            <div class="tl-title">Teacher notified</div>
+            <div class="tl-desc">Notification in feed + briefing card on group dashboard.</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot purple"></div>
+          <div class="tl-content">
+            <div class="tl-title">Student gets Study Coach</div>
+            <div class="tl-desc">Coach adjusts tone: "Let's focus on these 2 areas. Here's Chapter 7, pages 142–148."</div>
+          </div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-dot green"></div>
+          <div class="tl-content">
+            <div class="tl-title">Teacher sends targeted help</div>
+            <div class="tl-desc">Uses agent to draft guidance. Messages Aziza with specific reading links.</div>
+          </div>
+        </div>
+      </div>
+      <div style="background: var(--green-light); padding: 14px; border-radius: 10px; margin-top: 12px; text-align: center;">
+        <div style="font-weight: 700; color: var(--green); font-size: 1.3rem;">Same day</div>
+        <div style="font-size: 0.82rem; color: var(--gray-500);">teacher and student both get actionable guidance</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ GOLDEN PATH ════════════════ -->
+<div class="section" style="background: white; padding: 60px 0;">
+  <div class="container">
+    <h2 class="section-title">The Golden Path: Platform Setup → Value</h2>
+    <p class="section-sub">One-time setup unlocks continuous automated value</p>
+
+    <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; max-width: 1000px; margin: 0 auto;">
+      <div style="flex: 1; min-width: 140px; text-align: center; padding: 20px 12px; background: var(--blue-light); border-radius: 12px;">
+        <div style="font-size: 1.8rem;">🏗️</div>
+        <div style="font-weight: 700; font-size: 0.85rem; margin-top: 8px;">1. Structure</div>
+        <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 4px;">Subjects & Groups</div>
+        <div class="badge auto" style="margin: 6px 0 0;">1× setup</div>
+      </div>
+      <div style="display: flex; align-items: center; color: var(--gray-300); font-size: 1.5rem;">→</div>
+      <div style="flex: 1; min-width: 140px; text-align: center; padding: 20px 12px; background: var(--purple-light); border-radius: 12px;">
+        <div style="font-size: 1.8rem;">📚</div>
+        <div style="font-weight: 700; font-size: 0.85rem; margin-top: 8px;">2. Textbooks</div>
+        <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 4px;">Upload → RAG ingest</div>
+        <div class="badge auto" style="margin: 6px 0 0;">1× upload</div>
+      </div>
+      <div style="display: flex; align-items: center; color: var(--gray-300); font-size: 1.5rem;">→</div>
+      <div style="flex: 1; min-width: 140px; text-align: center; padding: 20px 12px; background: var(--green-light); border-radius: 12px;">
+        <div style="font-size: 1.8rem;">👨‍🎓</div>
+        <div style="font-weight: 700; font-size: 0.85rem; margin-top: 8px;">3. Enrollment</div>
+        <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 4px;">Join code → students in</div>
+        <div class="badge auto" style="margin: 6px 0 0;">self-serve</div>
+      </div>
+      <div style="display: flex; align-items: center; color: var(--gray-300); font-size: 1.5rem;">→</div>
+      <div style="flex: 1; min-width: 140px; text-align: center; padding: 20px 12px; background: var(--amber-light); border-radius: 12px;">
+        <div style="font-size: 1.8rem;">📝</div>
+        <div style="font-weight: 700; font-size: 0.85rem; margin-top: 8px;">4. Assessments</div>
+        <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 4px;">Create or AI-generate</div>
+        <div class="badge ai" style="margin: 6px 0 0;">AI option</div>
+      </div>
+      <div style="display: flex; align-items: center; color: var(--gray-300); font-size: 1.5rem;">→</div>
+      <div style="flex: 1; min-width: 140px; text-align: center; padding: 20px 12px; background: var(--red-light); border-radius: 12px; border: 2px solid var(--green);">
+        <div style="font-size: 1.8rem;">🔁</div>
+        <div style="font-weight: 700; font-size: 0.85rem; margin-top: 8px;">5–6. Continuous</div>
+        <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 4px;">Insights + Agent</div>
+        <div class="badge ai" style="margin: 6px 0 0;">always-on AI</div>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 30px; padding: 20px; background: var(--gray-50); border-radius: 12px; max-width: 700px; margin-left: auto; margin-right: auto;">
+      <div style="font-size: 0.9rem; color: var(--gray-700);">
+        <strong>Steps 1–3</strong> are one-time setup.
+        <strong>Step 4</strong> is the only recurring teacher action.
+        <strong>Steps 5–6</strong> run continuously and automatically — this is where 80% of the value lives.
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<!-- ════════════════ BOTTOM ════════════════ -->
+<div class="bottom-banner">
+  <h2>From 14 manual steps to 3 clicks + always-on AI</h2>
+  <p>Second Teacher doesn't replace the teacher — it gives them superpowers. Every student gets a personal study coach. Every teacher gets an analytics engine and an AI assistant that knows the textbook.</p>
+</div>
+
+</body>
+</html>

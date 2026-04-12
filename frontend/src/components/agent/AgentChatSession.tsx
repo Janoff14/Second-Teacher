@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CorpusSearchPanel } from "@/components/rag/CorpusSearchPanel";
 import { listGroups, listSubjects } from "@/lib/api/academic";
 import type { Group, Subject } from "@/lib/api/academic";
-import { parseAgentReply, studentAgentChat, teacherAgentChat } from "@/lib/api/agent";
+import { parseAgentReply, studentAgentChat, teacherAgentChat, type PageContext } from "@/lib/api/agent";
 import { useAuthStore } from "@/stores/auth-store";
 
 type Role = "teacher" | "student";
@@ -31,10 +31,12 @@ export function AgentChatSession({
   variant,
   fixedGroupId,
   fixedSubjectId,
+  pageContext,
 }: {
   variant: Role;
   fixedGroupId?: string;
   fixedSubjectId?: string;
+  pageContext?: PageContext;
 }) {
   const activeGroupId = useAuthStore((state) => state.activeGroupId);
   const showGroupSelectors = variant === "teacher" && !fixedGroupId?.trim();
@@ -119,8 +121,8 @@ export function AgentChatSession({
 
     const res =
       variant === "teacher"
-        ? await teacherAgentChat({ message: text, groupId: currentGroupId })
-        : await studentAgentChat({ message: text, groupId: currentGroupId });
+        ? await teacherAgentChat({ message: text, groupId: currentGroupId, pageContext })
+        : await studentAgentChat({ message: text, groupId: currentGroupId, pageContext });
 
     setSending(false);
     if (!res.ok) {

@@ -917,7 +917,12 @@ export default function StudentSubjectWorkspacePage() {
         </section>
       ) : null}
 
-      {activeTab === "coach" ? <StudyCoachPanel workspace={workspace} /> : null}
+      {activeTab === "coach" ? (
+        <StudyCoachPanel
+          workspace={workspace}
+          pageContext={{ page: "student-subject", tab: "coach" }}
+        />
+      ) : null}
     </div>
   );
 }

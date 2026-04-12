@@ -16,7 +16,7 @@ export function GoldenPathVisual() {
         {STEPS.map((s, i) => (
           <li
             key={s.label}
-            className="group relative flex flex-1 flex-col rounded-2xl border border-brand-200/50 bg-white px-3 py-4 text-center shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-card-hover dark:border-brand-800/30 dark:bg-brand-950/20 dark:hover:border-brand-700"
+            className="group relative flex flex-1 flex-col rounded-2xl border border-brand-200/50 bg-white px-3 py-4 text-center shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-card-hover dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-700"
           >
             <span className="mx-auto flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-violet-500 text-[11px] font-bold text-white shadow-sm">
               {i + 1}

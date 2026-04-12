@@ -72,9 +72,23 @@ export {
 export type { TeacherAgentBody, StudentAgentBody } from "./agent";
 export {
   listMyNotifications,
+  markNotificationRead,
   unwrapNotificationList,
 } from "./notifications";
 export type { AppNotification } from "./notifications";
+export {
+  listConversations,
+  listMessages,
+  sendMessage,
+  markMessageRead,
+  getUnreadCount,
+  unwrapMessageList,
+  unwrapThreadList,
+} from "./messages";
+export type {
+  DirectMessage,
+  ConversationThread,
+} from "./messages";
 export {
   listAuditLogs,
   getAuditExportUrl,
