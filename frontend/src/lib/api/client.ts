@@ -36,6 +36,60 @@ export async function apiRequest<T>(
   path: string,
   options: ApiRequestOptions = {},
 ): Promise<ApiResult<T>> {
+  const responseResult = await fetchWithApi(path, options);
+  if (!responseResult.ok) {
+    return responseResult;
+  }
+
+  const res = responseResult.data;
+  const contentType = res.headers.get("content-type") ?? "";
+  const isJson = contentType.includes("application/json");
+
+  let json: unknown = null;
+  if (res.status !== 204 && res.status !== 205) {
+    if (isJson) {
+      try {
+        json = await res.json();
+      } catch {
+        json = null;
+      }
+    }
+  }
+
+  if (json && typeof json === "object" && json !== null && "data" in json) {
+    return {
+      ok: true,
+      status: res.status,
+      data: (json as ApiSuccessEnvelope<T>).data,
+    };
+  }
+  return {
+    ok: true,
+    status: res.status,
+    data: undefined as T,
+  };
+}
+
+export async function apiBlobRequest(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<ApiResult<Blob>> {
+  const responseResult = await fetchWithApi(path, options);
+  if (!responseResult.ok) {
+    return responseResult;
+  }
+
+  return {
+    ok: true,
+    status: responseResult.status,
+    data: await responseResult.data.blob(),
+  };
+}
+
+async function fetchWithApi(
+  path: string,
+  options: ApiRequestOptions = {},
+): Promise<ApiResult<Response>> {
   const { skipAuth, headers: initHeaders, ...rest } = options;
   const headers = new Headers(initHeaders);
 
@@ -75,38 +129,28 @@ export async function apiRequest<T>(
     };
   }
 
-  const contentType = res.headers.get("content-type") ?? "";
-  const isJson = contentType.includes("application/json");
-
-  let json: unknown = null;
-  if (res.status !== 204 && res.status !== 205) {
-    if (isJson) {
-      try {
-        json = await res.json();
-      } catch {
-        json = null;
-      }
-    }
-  }
-
   if (res.status === 401) {
     useAuthStore.getState().clearSession();
     redirectToLoginIfNeeded();
   }
 
   if (res.ok) {
-    if (json && typeof json === "object" && json !== null && "data" in json) {
-      return {
-        ok: true,
-        status: res.status,
-        data: (json as ApiSuccessEnvelope<T>).data,
-      };
-    }
     return {
       ok: true,
       status: res.status,
-      data: undefined as T,
+      data: res,
     };
+  }
+
+  const contentType = res.headers.get("content-type") ?? "";
+  const isJson = contentType.includes("application/json");
+  let json: unknown = null;
+  if (res.status !== 204 && res.status !== 205 && isJson) {
+    try {
+      json = await res.json();
+    } catch {
+      json = null;
+    }
   }
 
   if (json && typeof json === "object" && json !== null && "error" in json) {

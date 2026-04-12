@@ -2,6 +2,14 @@ import { randomUUID } from "node:crypto";
 import { logger } from "../config/logger";
 import { embedTexts, hasOpenAI, EMBEDDING_DIM } from "../lib/openai";
 import { getSupabaseServiceRoleClient } from "../lib/supabase";
+import { clearLocalTextbookAssetsForTest, saveTextbookAsset } from "../lib/textbookAssets";
+import {
+  buildTextbookReaderDocument,
+  type TextbookChapterRecord,
+  type TextbookParagraphRecord,
+  type TextbookReaderDocument,
+  type TextbookReaderSeed,
+} from "../lib/textbookReader";
 import type { AssessmentVersion } from "./assessmentStore";
 
 export type ChunkSourceType = "textbook" | "assessment_version";
@@ -26,30 +34,6 @@ export interface TextbookCitationLocation {
   paragraphId: string;
   sentenceStart: number;
   sentenceEnd: number;
-}
-
-interface TextbookParagraphRecord {
-  id: string;
-  chapterNumber: number;
-  chapterTitle: string;
-  paragraphIndexInChapter: number;
-  pageNumber: number;
-  text: string;
-  sentences: string[];
-}
-
-interface TextbookChapterRecord {
-  chapterNumber: number;
-  title: string;
-  startPage: number;
-  endPage: number;
-  paragraphIds: string[];
-}
-
-interface TextbookReaderDocument {
-  sourceId: string;
-  chapters: TextbookChapterRecord[];
-  paragraphs: TextbookParagraphRecord[];
 }
 
 export interface CorpusChunk {
@@ -106,112 +90,6 @@ function cosineSimilarity(a: number[], b: number[]): number {
     s += a[i]! * b[i]!;
   }
   return s;
-}
-
-function isChapterHeading(line: string): boolean {
-  const trimmed = line.trim();
-  if (!trimmed) {
-    return false;
-  }
-  return /^#{1,6}\s+\S/.test(trimmed) || /^chapter\s+\d+([:\s-].*)?$/i.test(trimmed);
-}
-
-function cleanChapterHeading(line: string): string {
-  const trimmed = line.trim();
-  if (/^#{1,6}\s+\S/.test(trimmed)) {
-    return trimmed.replace(/^#{1,6}\s+/, "");
-  }
-  return trimmed;
-}
-
-function splitChapterBlocks(text: string): Array<{ title: string; body: string }> {
-  const normalized = text.replace(/\r\n/g, "\n").trim();
-  if (!normalized) {
-    return [];
-  }
-  const lines = normalized.split("\n");
-  const blocks: Array<{ title: string; body: string }> = [];
-  let currentTitle = "Chapter 1";
-  let currentLines: string[] = [];
-
-  for (const line of lines) {
-    if (isChapterHeading(line)) {
-      if (currentLines.join("\n").trim()) {
-        blocks.push({ title: currentTitle, body: currentLines.join("\n").trim() });
-      }
-      currentTitle = cleanChapterHeading(line);
-      currentLines = [];
-      continue;
-    }
-    currentLines.push(line);
-  }
-
-  if (currentLines.join("\n").trim()) {
-    blocks.push({ title: currentTitle, body: currentLines.join("\n").trim() });
-  }
-
-  if (blocks.length === 0) {
-    return [{ title: "Chapter 1", body: normalized }];
-  }
-
-  return blocks.map((block, idx) => {
-    if (block.title === "Chapter 1" && idx > 0) {
-      return { ...block, title: `Chapter ${idx + 1}` };
-    }
-    return block;
-  });
-}
-
-function splitSentences(text: string): string[] {
-  const matches = text.match(/[^.!?]+[.!?]?/g) ?? [];
-  const sentences = matches.map((s) => s.trim()).filter(Boolean);
-  if (sentences.length === 0 && text.trim()) {
-    return [text.trim()];
-  }
-  return sentences;
-}
-
-function buildTextbookReaderDocument(sourceId: string, rawText: string): TextbookReaderDocument {
-  const chapterBlocks = splitChapterBlocks(rawText);
-  const paragraphs: TextbookParagraphRecord[] = [];
-  const chapters: TextbookChapterRecord[] = [];
-  const PAGE_CHAR_BUDGET = 1800;
-  let consumedChars = 0;
-
-  chapterBlocks.forEach((block, chapterIndex) => {
-    const chapterNumber = chapterIndex + 1;
-    const chapterParagraphIds: string[] = [];
-    const chapterParagraphs = block.body
-      .split(/\n\s*\n/)
-      .map((p) => p.trim())
-      .filter(Boolean);
-    const chapterStartPage = Math.floor(consumedChars / PAGE_CHAR_BUDGET) + 1;
-    chapterParagraphs.forEach((paragraphText, paragraphIndex) => {
-      const paragraphId = `tbp_${sourceId}_${chapterNumber}_${paragraphIndex + 1}`;
-      const pageNumber = Math.floor(consumedChars / PAGE_CHAR_BUDGET) + 1;
-      paragraphs.push({
-        id: paragraphId,
-        chapterNumber,
-        chapterTitle: block.title,
-        paragraphIndexInChapter: paragraphIndex + 1,
-        pageNumber,
-        text: paragraphText,
-        sentences: splitSentences(paragraphText),
-      });
-      chapterParagraphIds.push(paragraphId);
-      consumedChars += paragraphText.length + 2;
-    });
-    const chapterEndPage = Math.max(chapterStartPage, Math.floor(Math.max(consumedChars - 1, 0) / PAGE_CHAR_BUDGET) + 1);
-    chapters.push({
-      chapterNumber,
-      title: block.title,
-      startPage: chapterStartPage,
-      endPage: chapterEndPage,
-      paragraphIds: chapterParagraphIds,
-    });
-  });
-
-  return { sourceId, chapters, paragraphs };
 }
 
 function createTextbookChunks(
@@ -335,10 +213,16 @@ export async function loadTextbooksFromDb(): Promise<number> {
     logger.error({ err: readerErr }, "supabase_load_textbook_reader_docs_failed");
   } else if (readerRows) {
     for (const row of readerRows) {
+      const chapters = row.chapters as TextbookChapterRecord[];
+      const paragraphs = row.paragraphs as TextbookParagraphRecord[];
       textbookReaderDocuments.set(row.source_id, {
         sourceId: row.source_id,
-        chapters: row.chapters as TextbookChapterRecord[],
-        paragraphs: row.paragraphs as TextbookParagraphRecord[],
+        chapters,
+        paragraphs,
+        totalPages:
+          chapters.at(-1)?.endPage ??
+          paragraphs.reduce((max, paragraph) => Math.max(max, paragraph.pageNumber), 1),
+        chapterSource: "fallback",
       });
     }
   }
@@ -409,6 +293,8 @@ export async function ingestTextbook(params: {
   createdBy: string;
   originalFileName?: string;
   sourceFormat?: "pdf" | "docx" | "doc" | "txt";
+  readerSeed?: TextbookReaderSeed;
+  assetBuffer?: Buffer;
 }): Promise<{ source: TextbookSourceRecord; chunksCreated: number }> {
   return runWithRetry("ingest_textbook", 3, () => ingestTextbookCore(params));
 }
@@ -421,6 +307,8 @@ async function ingestTextbookCore(params: {
   createdBy: string;
   originalFileName?: string;
   sourceFormat?: "pdf" | "docx" | "doc" | "txt";
+  readerSeed?: TextbookReaderSeed;
+  assetBuffer?: Buffer;
 }): Promise<{ source: TextbookSourceRecord; chunksCreated: number }> {
   const client = db();
   const now = new Date().toISOString();
@@ -435,9 +323,17 @@ async function ingestTextbookCore(params: {
     ...(params.originalFileName ? { originalFileName: params.originalFileName } : {}),
     ...(params.sourceFormat ? { sourceFormat: params.sourceFormat } : {}),
   };
+  if (params.assetBuffer) {
+    await saveTextbookAsset({
+      sourceId: source.id,
+      buffer: params.assetBuffer,
+      originalFileName: params.originalFileName,
+      sourceFormat: params.sourceFormat,
+    });
+  }
   textbookSources.push(source);
 
-  const readerDoc = buildTextbookReaderDocument(source.id, params.text);
+  const readerDoc = buildTextbookReaderDocument(source.id, params.text, params.readerSeed);
   textbookReaderDocuments.set(source.id, readerDoc);
   const pieces = createTextbookChunks(source, readerDoc);
   if (pieces.length === 0) {
@@ -667,6 +563,7 @@ export function resetRagStoreForTest(): void {
   textbookReaderDocuments.clear();
   textbookSourceCounter = 1;
   chunkCounter = 1;
+  clearLocalTextbookAssetsForTest();
 }
 
 export function getTextbookSourceById(textbookSourceId: string): TextbookSourceRecord | undefined {

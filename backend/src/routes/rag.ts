@@ -1,3 +1,4 @@
+import { createReadStream, statSync } from "node:fs";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import multer from "multer";
@@ -16,6 +17,7 @@ import {
   queryCorpus,
 } from "../domain/ragStore";
 import { appendAuditLog } from "../domain/auditStore";
+import { getTextbookAssetInfo } from "../lib/textbookAssets";
 import { extractTextFromUploadedDocument } from "../lib/documentText";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
@@ -53,6 +55,50 @@ function uploadTextbookFile(req: Request, res: Response, next: NextFunction) {
         : "UPLOAD_FAILED";
     next(wrapped);
   });
+}
+
+function resolveReaderSourceAccess(user: NonNullable<Request["user"]>, groupId: string, textbookSourceId: string) {
+  const group = getGroup(groupId);
+  if (!group) {
+    const err = new Error("Group not found") as Error & { statusCode?: number; code?: string };
+    err.statusCode = 404;
+    err.code = "GROUP_NOT_FOUND";
+    throw err;
+  }
+
+  if (user.role === "student") {
+    if (!isStudentInGroup(user.userId, groupId)) {
+      const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
+      err.statusCode = 403;
+      err.code = "FORBIDDEN";
+      throw err;
+    }
+  } else if (user.role === "teacher") {
+    if (!canTeacherManageGroup(user.userId, user.role, groupId)) {
+      const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
+      err.statusCode = 403;
+      err.code = "FORBIDDEN";
+      throw err;
+    }
+  } else if (user.role !== "admin") {
+    const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
+    err.statusCode = 403;
+    err.code = "FORBIDDEN";
+    throw err;
+  }
+
+  const source = getTextbookSourceById(textbookSourceId);
+  if (!source || source.subjectId !== group.subjectId) {
+    const err = new Error("Reader source not found for this group") as Error & {
+      statusCode?: number;
+      code?: string;
+    };
+    err.statusCode = 404;
+    err.code = "READER_SOURCE_NOT_FOUND";
+    throw err;
+  }
+
+  return { group, source };
 }
 
 ragRouter.get(
@@ -170,6 +216,8 @@ ragRouter.post(
         createdBy: user.userId,
         originalFileName: extracted.originalFileName,
         sourceFormat: extracted.sourceFormat,
+        ...(extracted.readerSeed ? { readerSeed: extracted.readerSeed } : {}),
+        assetBuffer: file.buffer,
       });
 
       appendAuditLog({
@@ -267,45 +315,7 @@ ragRouter.get("/reader/textbooks/:textbookSourceId", requireAuth, (req, res, nex
       throw err;
     }
     const user = req.user!;
-    const group = getGroup(groupId);
-    if (!group) {
-      const err = new Error("Group not found") as Error & { statusCode?: number; code?: string };
-      err.statusCode = 404;
-      err.code = "GROUP_NOT_FOUND";
-      throw err;
-    }
-
-    if (user.role === "student") {
-      if (!isStudentInGroup(user.userId, groupId)) {
-        const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
-        err.statusCode = 403;
-        err.code = "FORBIDDEN";
-        throw err;
-      }
-    } else if (user.role === "teacher") {
-      if (!canTeacherManageGroup(user.userId, user.role, groupId)) {
-        const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
-        err.statusCode = 403;
-        err.code = "FORBIDDEN";
-        throw err;
-      }
-    } else if (user.role !== "admin") {
-      const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
-      err.statusCode = 403;
-      err.code = "FORBIDDEN";
-      throw err;
-    }
-
-    const source = getTextbookSourceById(textbookSourceId);
-    if (!source || source.subjectId !== group.subjectId) {
-      const err = new Error("Reader source not found for this group") as Error & {
-        statusCode?: number;
-        code?: string;
-      };
-      err.statusCode = 404;
-      err.code = "READER_SOURCE_NOT_FOUND";
-      throw err;
-    }
+    const { source } = resolveReaderSourceAccess(user, groupId, textbookSourceId);
     const readerDoc = getTextbookReaderDocument(textbookSourceId);
     if (!readerDoc) {
       const err = new Error("Reader document not indexed") as Error & { statusCode?: number; code?: string };
@@ -322,12 +332,35 @@ ragRouter.get("/reader/textbooks/:textbookSourceId", requireAuth, (req, res, nex
       : undefined;
     const sentenceStart = Number.isFinite(sentenceStartRaw) ? Math.max(1, sentenceStartRaw!) : undefined;
     const sentenceEnd = Number.isFinite(sentenceEndRaw) ? Math.max(sentenceStart ?? 1, sentenceEndRaw!) : undefined;
+    const assetInfo = getTextbookAssetInfo({
+      sourceId: source.id,
+      originalFileName: source.originalFileName,
+      sourceFormat: source.sourceFormat,
+    });
 
     res.status(200).json({
       data: {
-        source,
+        source: {
+          id: source.id,
+          title: source.title,
+          versionLabel: source.versionLabel,
+          ...(source.originalFileName ? { originalFileName: source.originalFileName } : {}),
+          ...(source.sourceFormat ? { sourceFormat: source.sourceFormat } : {}),
+          assetAvailable: assetInfo !== null,
+        },
         chapters: readerDoc.chapters,
         paragraphs: readerDoc.paragraphs,
+        totalPages: readerDoc.totalPages,
+        asset:
+          assetInfo !== null
+            ? {
+                available: true,
+                mimeType: assetInfo.mimeType,
+                fileName: assetInfo.fileName,
+              }
+            : {
+                available: false,
+              },
         focus:
           focusParagraph !== undefined
             ? {
@@ -341,6 +374,51 @@ ragRouter.get("/reader/textbooks/:textbookSourceId", requireAuth, (req, res, nex
             : null,
       },
     });
+  } catch (e) {
+    next(e);
+  }
+});
+
+ragRouter.get("/reader/textbooks/:textbookSourceId/asset", requireAuth, (req, res, next) => {
+  try {
+    const textbookSourceId = req.params.textbookSourceId;
+    if (!textbookSourceId || Array.isArray(textbookSourceId)) {
+      const err = new Error("textbookSourceId is required") as Error & { statusCode?: number; code?: string };
+      err.statusCode = 400;
+      err.code = "VALIDATION_ERROR";
+      throw err;
+    }
+    const groupId = typeof req.query.groupId === "string" ? req.query.groupId : undefined;
+    if (!groupId) {
+      const err = new Error("groupId is required") as Error & { statusCode?: number; code?: string };
+      err.statusCode = 400;
+      err.code = "VALIDATION_ERROR";
+      throw err;
+    }
+
+    const user = req.user!;
+    const { source } = resolveReaderSourceAccess(user, groupId, textbookSourceId);
+    const assetInfo = getTextbookAssetInfo({
+      sourceId: source.id,
+      originalFileName: source.originalFileName,
+      sourceFormat: source.sourceFormat,
+    });
+    if (!assetInfo) {
+      const err = new Error("Original textbook file is unavailable for this reader") as Error & {
+        statusCode?: number;
+        code?: string;
+      };
+      err.statusCode = 404;
+      err.code = "READER_ASSET_NOT_FOUND";
+      throw err;
+    }
+
+    res.setHeader("Content-Type", assetInfo.mimeType);
+    res.setHeader("Content-Disposition", `inline; filename="${assetInfo.fileName}"`);
+    res.setHeader("Content-Length", statSync(assetInfo.path).size);
+    const stream = createReadStream(assetInfo.path);
+    stream.on("error", next);
+    stream.pipe(res);
   } catch (e) {
     next(e);
   }

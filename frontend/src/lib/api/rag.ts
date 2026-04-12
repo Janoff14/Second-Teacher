@@ -1,4 +1,4 @@
-import { apiRequest } from "./client";
+import { apiBlobRequest, apiRequest } from "./client";
 
 export type TextbookIngestBody = {
   subjectId: string;
@@ -28,6 +28,9 @@ export type ReaderDocumentResponse = {
     id: string;
     title: string;
     versionLabel: string;
+    originalFileName?: string;
+    sourceFormat?: "pdf" | "docx" | "doc" | "txt" | null;
+    assetAvailable: boolean;
   };
   chapters: Array<{
     chapterNumber: number;
@@ -53,6 +56,16 @@ export type ReaderDocumentResponse = {
     sentenceStart?: number;
     sentenceEnd?: number;
   } | null;
+  totalPages: number;
+  asset:
+    | {
+        available: true;
+        mimeType: string;
+        fileName: string;
+      }
+    | {
+        available: false;
+      };
 };
 
 export async function ingestTextbook(body: TextbookIngestBody) {
@@ -114,6 +127,17 @@ export async function getReaderDocument(params: {
   if (params.sentenceEnd !== undefined) q.set("sentenceEnd", String(params.sentenceEnd));
   return apiRequest<ReaderDocumentResponse>(
     `/reader/textbooks/${params.textbookSourceId}?${q.toString()}`,
+    { method: "GET" },
+  );
+}
+
+export async function getReaderDocumentAsset(params: {
+  textbookSourceId: string;
+  groupId: string;
+}) {
+  const q = new URLSearchParams({ groupId: params.groupId });
+  return apiBlobRequest(
+    `/reader/textbooks/${params.textbookSourceId}/asset?${q.toString()}`,
     { method: "GET" },
   );
 }
