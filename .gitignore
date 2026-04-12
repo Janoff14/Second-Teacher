@@ -6,10 +6,13 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+!**/.env.example
 
 # Logs / caches
 *.log
 .cache/
+.local/
+backend/.local/
 
 # Node build artifacts
 node_modules/
