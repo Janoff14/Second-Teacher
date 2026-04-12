@@ -214,7 +214,8 @@ academicRouter.get(
   requireRole(["admin", "teacher"]),
   async (req, res, next) => {
     try {
-      const { groupId, studentId } = req.params;
+      const groupId = req.params.groupId as string;
+      const studentId = req.params.studentId as string;
       if (!groupId || !studentId) throw new Error("groupId and studentId required");
       const user = req.user!;
       if (!canTeacherManageGroup(user.userId, user.role, groupId)) {
