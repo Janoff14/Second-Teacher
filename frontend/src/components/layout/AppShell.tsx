@@ -45,6 +45,12 @@ function isActive(pathname: string, href: string): boolean {
   return pathname.startsWith(href);
 }
 
+const sectionGradient: Record<Section, string> = {
+  teacher: "from-brand-600 via-brand-500 to-violet-500",
+  student: "from-accent-600 via-accent-500 to-cyan-500",
+  admin: "from-amber-600 via-orange-500 to-rose-500",
+};
+
 export function AppShell({
   section,
   children,
@@ -113,7 +119,7 @@ export function AppShell({
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-background">
       {section === "teacher" ? (
         <TeacherCommandPalette
           groupId={decodedTeacherGroupId}
@@ -121,14 +127,16 @@ export function AppShell({
           onClose={closePalette}
         />
       ) : null}
-      <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <div className="flex flex-wrap items-center gap-4">
+
+      <header className="sticky top-0 z-40 border-b border-foreground/8 bg-glass">
+        <div className={`h-1 bg-gradient-to-r ${sectionGradient[section]}`} />
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-3">
+          <div className="flex flex-wrap items-center gap-5">
             <Link
               href={section === "admin" ? "/admin" : section === "student" ? "/student" : "/teacher"}
-              className="font-semibold text-neutral-900 dark:text-neutral-100"
+              className="text-lg font-bold tracking-tight text-foreground"
             >
-              Second Teacher
+              Second<span className="text-gradient-brand">Teacher</span>
             </Link>
             <nav className="flex flex-wrap gap-1 text-sm">
               {tabs.map((tab) => (
@@ -137,8 +145,8 @@ export function AppShell({
                   href={tab.href}
                   className={
                     isActive(pathname, tab.href)
-                      ? "rounded-md bg-neutral-100 px-2.5 py-1 font-medium text-neutral-900 dark:bg-neutral-800 dark:text-neutral-50"
-                      : "rounded-md px-2.5 py-1 text-neutral-600 hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-900"
+                      ? "rounded-full bg-brand-100 px-3.5 py-1.5 font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300"
+                      : "rounded-full px-3.5 py-1.5 text-foreground/70 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-950/50 dark:hover:text-brand-400"
                   }
                 >
                   {tab.label}
@@ -146,30 +154,30 @@ export function AppShell({
               ))}
             </nav>
           </div>
-          <div className="flex items-center gap-3 text-sm text-neutral-600 dark:text-neutral-400">
+          <div className="flex items-center gap-3 text-sm">
             {section === "teacher" ? (
               <button
                 type="button"
                 title="Open class assistant (Ctrl+K or Cmd+K)"
                 onClick={() => setPaletteOpen(true)}
-                className="relative rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-800 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-900"
+                className="relative rounded-full bg-gradient-to-r from-brand-500 to-violet-500 px-4 py-1.5 text-xs font-semibold text-white shadow-glow transition-shadow hover:shadow-glow-lg"
               >
                 Assistant
                 {attentionCount != null && attentionCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-semibold text-white">
+                  <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white dark:ring-brand-950">
                     {attentionCount > 9 ? "9+" : attentionCount}
                   </span>
                 ) : null}
               </button>
             ) : null}
             {role && (
-              <span className="rounded bg-neutral-100 px-2 py-0.5 capitalize dark:bg-neutral-800">
+              <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold capitalize text-brand-600 dark:bg-brand-950 dark:text-brand-300">
                 {role}
               </span>
             )}
             {role === "student" && activeGroupId && (
               <span
-                className="max-w-[10rem] truncate font-mono text-xs text-neutral-500"
+                className="max-w-[10rem] truncate font-mono text-xs text-foreground/55"
                 title={activeGroupId}
               >
                 group {activeGroupId.slice(0, 8)}&hellip;
@@ -178,14 +186,14 @@ export function AppShell({
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-md border border-neutral-300 px-3 py-1.5 text-neutral-800 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-900"
+              className="rounded-full border border-foreground/15 px-4 py-1.5 text-sm font-medium text-foreground/70 transition-all hover:border-brand-300 hover:text-brand-600 dark:hover:border-brand-700 dark:hover:text-brand-400"
             >
               Chiqish
             </button>
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8">
         {children}
       </main>
     </div>

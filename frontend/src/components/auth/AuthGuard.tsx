@@ -36,8 +36,8 @@ export function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
 
   if (!hydrated) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-neutral-500">
-        Loading…
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-300 border-t-brand-600" />
       </div>
     );
   }
