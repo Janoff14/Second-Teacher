@@ -1,13 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import { parseAgentReply, studentAgentChat } from "@/lib/api/agent";
+import { parseAgentReply, studentAgentChat, type StudentAgentReading } from "@/lib/api/agent";
 import type { StudentWorkspace } from "@/lib/api/student";
 
 type CoachMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  readings?: StudentAgentReading[];
+  suggestedAssessments?: Array<{ id: string; title: string; link: string }>;
 };
 
 export function StudyCoachPanel({
@@ -45,10 +48,25 @@ export function StudyCoachPanel({
       setError(result.error.message);
       return;
     }
-    const reply = parseAgentReply(result.data) || "No reply returned.";
+    const data = result.data;
+    const reply = typeof data === "object" && data !== null && "reply" in data
+      ? (data as { reply: string }).reply
+      : parseAgentReply(data) || "No reply returned.";
+    const readings = typeof data === "object" && data !== null && "readings" in data
+      ? (data as { readings: StudentAgentReading[] }).readings ?? []
+      : [];
+    const suggestedAssessments = typeof data === "object" && data !== null && "suggestedAssessments" in data
+      ? (data as { suggestedAssessments: Array<{ id: string; title: string; link: string }> }).suggestedAssessments ?? []
+      : [];
     setMessages((current) => [
       ...current,
-      { id: `a-${Date.now()}`, role: "assistant", content: reply },
+      {
+        id: `a-${Date.now()}`,
+        role: "assistant",
+        content: reply,
+        readings,
+        suggestedAssessments,
+      },
     ]);
   }
 
@@ -94,19 +112,74 @@ export function StudyCoachPanel({
             </div>
           ) : null}
           {messages.map((message) => (
-            <div
-              key={message.id}
-              className={
-                message.role === "user"
-                  ? "ml-8 rounded-2xl bg-blue-600 px-4 py-3 text-sm text-white"
-                  : "mr-8 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-800 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200"
-              }
-            >
-              <p className="whitespace-pre-wrap">{message.content}</p>
+            <div key={message.id}>
+              <div
+                className={
+                  message.role === "user"
+                    ? "ml-8 rounded-2xl bg-blue-600 px-4 py-3 text-sm text-white"
+                    : "mr-8 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-800 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200"
+                }
+              >
+                <p className="whitespace-pre-wrap">{message.content}</p>
+              </div>
+              {message.role === "assistant" && message.readings && message.readings.length > 0 ? (
+                <div className="mr-8 mt-2 space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                    Recommended readings
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {message.readings.map((reading, idx) => (
+                      <a
+                        key={`${message.id}-r-${idx}`}
+                        href={reading.readerPath}
+                        className="inline-flex items-center gap-1.5 rounded-2xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800 transition hover:-translate-y-0.5 hover:shadow-sm dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200"
+                      >
+                        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                        <span className="font-medium">{reading.chapterTitle ?? reading.title}</span>
+                        {reading.pageNumber ? <span className="text-blue-600/70 dark:text-blue-300/70">p.{reading.pageNumber}</span> : null}
+                      </a>
+                    ))}
+                  </div>
+                  {message.readings.some((r) => r.highlightText) ? (
+                    <div className="space-y-1.5">
+                      {message.readings.filter((r) => r.highlightText).slice(0, 2).map((r, idx) => (
+                        <a
+                          key={`${message.id}-hl-${idx}`}
+                          href={r.readerPath}
+                          className="block rounded-xl border border-neutral-200 bg-white px-3 py-2.5 text-xs transition hover:border-blue-300 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:border-blue-800"
+                        >
+                          <p className="font-medium text-neutral-800 dark:text-neutral-200">{r.sourceTitle}</p>
+                          <p className="mt-1 line-clamp-2 text-neutral-600 dark:text-neutral-400">{r.highlightText}</p>
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {message.role === "assistant" && message.suggestedAssessments && message.suggestedAssessments.length > 0 ? (
+                <div className="mr-8 mt-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                    Practice these
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {message.suggestedAssessments.map((a) => (
+                      <Link
+                        key={a.id}
+                        href={a.link}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
+                        {a.title}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ))}
           {loading ? (
-            <div className="mr-8 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950">
+            <div className="mr-8 flex items-center gap-2 rounded-2xl border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-500 dark:border-neutral-800 dark:bg-neutral-950">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-neutral-300 border-t-blue-600" />
               Building your coach reply...
             </div>
           ) : null}
@@ -192,6 +265,19 @@ export function StudyCoachPanel({
                   <p className="mt-2 text-sm text-amber-900/80 dark:text-amber-100/90">
                     {alert.body}
                   </p>
+                  {alert.recommendedReadings.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {alert.recommendedReadings.map((reading) => (
+                        <a
+                          key={reading.id}
+                          href={reading.readerPath}
+                          className="rounded-full border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-medium text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:bg-transparent dark:text-amber-100"
+                        >
+                          {reading.chapterTitle ?? reading.title}{reading.pageNumber ? ` p.${reading.pageNumber}` : ""}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))
             )}

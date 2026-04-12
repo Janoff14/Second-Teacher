@@ -97,6 +97,45 @@ export type StudentWorkspace = {
   };
 };
 
+export type StudyPlanStep = {
+  id: string;
+  priority: number;
+  action: "read" | "redo" | "practice" | "review";
+  title: string;
+  reason: string;
+  readerLink?: string;
+  assessmentLink?: string;
+  estimatedMinutes: number;
+  readings: ReaderRecommendation[];
+};
+
+export type AiStudyReport = {
+  subject: { id: string; name: string };
+  group: { id: string; name: string };
+  generatedAt: string;
+  overallGrade: "strong" | "adequate" | "needs_work" | "critical";
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  studyPlan: StudyPlanStep[];
+  topicBreakdown: Array<{
+    topic: string;
+    scorePct: number | null;
+    missCount: number;
+    status: "mastered" | "solid" | "shaky" | "weak";
+    readings: ReaderRecommendation[];
+  }>;
+  suggestedRetakes: Array<{
+    assessmentVersionId: string;
+    title: string;
+    type: "practice" | "quiz" | "test" | "exam" | "assessment";
+    latestScorePct: number | null;
+    reason: string;
+    assessmentLink: string;
+  }>;
+  aiNarrative: string;
+};
+
 export async function listStudentAcademicScope() {
   return apiRequest<StudentAcademicScopeItem[]>("/student/academic-scope", {
     method: "GET",
@@ -105,6 +144,12 @@ export async function listStudentAcademicScope() {
 
 export async function getStudentWorkspace(groupId: string) {
   return apiRequest<StudentWorkspace>(`/student/groups/${groupId}/workspace`, {
+    method: "GET",
+  });
+}
+
+export async function getStudentAiReport(groupId: string) {
+  return apiRequest<AiStudyReport>(`/student/groups/${groupId}/ai-report`, {
     method: "GET",
   });
 }

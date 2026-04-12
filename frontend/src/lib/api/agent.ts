@@ -49,8 +49,24 @@ export async function teacherBriefingQuery(body: TeacherAgentBody) {
   });
 }
 
+export type StudentAgentReading = {
+  title: string;
+  sourceTitle: string;
+  readerPath: string;
+  highlightText: string;
+  pageNumber?: number;
+  chapterTitle?: string;
+};
+
+export type StudentAgentResponse = {
+  reply: string;
+  readings: StudentAgentReading[];
+  suggestedAssessments: Array<{ id: string; title: string; link: string }>;
+  fallback: boolean;
+};
+
 export async function studentAgentChat(body: StudentAgentBody) {
-  return apiRequest<unknown>("/agent/student/chat", {
+  return apiRequest<StudentAgentResponse>("/agent/student/chat", {
     method: "POST",
     body: JSON.stringify(body),
   });

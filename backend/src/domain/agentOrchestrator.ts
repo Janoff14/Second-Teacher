@@ -112,6 +112,20 @@ function buildTeacherReply(message: string, insights: InsightRecord[], hits: Ret
   return lines.join("\n");
 }
 
+export type StudentReplyReading = {
+  title: string;
+  sourceTitle: string;
+  readerPath: string;
+  highlightText: string;
+  pageNumber?: number;
+  chapterTitle?: string;
+};
+
+export type StudentAgentStructuredResult = AgentChatResult & {
+  readings: StudentReplyReading[];
+  suggestedAssessments: Array<{ id: string; title: string; link: string }>;
+};
+
 function buildStudentReply(
   message: string,
   insights: InsightRecord[],
@@ -138,7 +152,11 @@ function buildStudentReply(
   if (hits.length > 0) {
     lines.push("**Material to review (with citations)**");
     for (const h of hits.slice(0, 5)) {
-      lines.push(`- ${h.citation.anchor}: ${h.text.slice(0, 200)}${h.text.length > 200 ? "…" : ""}`);
+      const loc = h.citation.textbookLocation;
+      const locLabel = loc?.chapterTitle
+        ? `${loc.chapterTitle}${loc.pageNumber ? ` p.${loc.pageNumber}` : ""}`
+        : h.citation.anchor;
+      lines.push(`- **${locLabel}**: ${h.text.slice(0, 200)}${h.text.length > 200 ? "…" : ""}`);
     }
     lines.push("");
   }
@@ -146,6 +164,25 @@ function buildStudentReply(
   lines.push("");
   lines.push(`_You asked:_ ${message.slice(0, 400)}${message.length > 400 ? "…" : ""}`);
   return lines.join("\n");
+}
+
+function extractStudentReadings(hits: RetrievalHit[], groupId: string): StudentReplyReading[] {
+  return hits
+    .filter((h) => h.citation.readerPath && h.citation.textbookSourceId)
+    .map((h) => {
+      const readerPath = h.citation.readerPath!.includes("?")
+        ? `${h.citation.readerPath!}&groupId=${encodeURIComponent(groupId)}`
+        : `${h.citation.readerPath!}?groupId=${encodeURIComponent(groupId)}`;
+      return {
+        title: h.citation.textbookLocation?.chapterTitle ?? h.citation.anchor,
+        sourceTitle: h.citation.sourceType === "textbook" ? "Course textbook" : "Course material",
+        readerPath,
+        highlightText: h.citation.highlightText ?? h.text.slice(0, 120),
+        ...(h.citation.textbookLocation?.pageNumber !== undefined ? { pageNumber: h.citation.textbookLocation.pageNumber } : {}),
+        ...(h.citation.textbookLocation?.chapterTitle !== undefined ? { chapterTitle: h.citation.textbookLocation.chapterTitle } : {}),
+      };
+    })
+    .slice(0, 5);
 }
 
 export async function enrichTeacherBriefingWithOptionalLLM(
@@ -340,7 +377,7 @@ export async function runStudentAgentChat(params: {
   message: string;
   timeoutMs: number;
   requestId?: string;
-}): Promise<AgentChatResult> {
+}): Promise<StudentAgentStructuredResult> {
   const group = getGroup(params.groupId);
   if (!group) {
     const err = new Error("Group not found") as Error & { statusCode?: number; code?: string };
@@ -349,7 +386,7 @@ export async function runStudentAgentChat(params: {
     throw err;
   }
 
-  const doWork = async (): Promise<AgentChatResult> => {
+  const doWork = async (): Promise<StudentAgentStructuredResult> => {
     if (env.NODE_ENV === "test" && params.message.includes("__delay300__")) {
       await new Promise((r) => setTimeout(r, 300));
     }
@@ -397,12 +434,22 @@ export async function runStudentAgentChat(params: {
       data: hits,
     });
 
+    const readings = extractStudentReadings(hits, params.groupId);
+
+    const suggestedAssessments = openNow.slice(0, 3).map((v) => ({
+      id: v.id,
+      title: v.title,
+      link: `/student/assessments/take/${v.id}`,
+    }));
+
     const reply = buildStudentReply(params.message, insights, hits, scheduleSummary);
     return {
       reply,
       tools,
       citations: hits.map((h) => h.citation),
       fallback: false,
+      readings,
+      suggestedAssessments,
     };
   };
 
@@ -420,6 +467,8 @@ export async function runStudentAgentChat(params: {
         tools: [{ name: "get_assessment_schedule", ok: false, summary: "Timed out" }],
         citations: [],
         fallback: true,
+        readings: [],
+        suggestedAssessments: [],
       };
     }
     throw err;

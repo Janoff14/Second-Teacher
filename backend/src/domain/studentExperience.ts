@@ -24,6 +24,7 @@ import {
   queryCorpus,
   type RetrievalHit,
 } from "./ragStore";
+import { briefCompletion, hasOpenAI } from "../lib/openai";
 
 export type AssessmentCategory = "practice" | "quiz" | "test" | "exam" | "assessment";
 export type StudentChallengeStatus = "needs_support" | "on_track" | "needs_challenge";
@@ -573,5 +574,255 @@ export async function buildStudentWorkspace(studentId: string, groupId: string):
         "Show me what to read before the next quiz.",
       ],
     },
+  };
+}
+
+export type StudyPlanStep = {
+  id: string;
+  priority: number;
+  action: "read" | "redo" | "practice" | "review";
+  title: string;
+  reason: string;
+  readerLink?: string | undefined;
+  assessmentLink?: string | undefined;
+  estimatedMinutes: number;
+  readings: StudentReaderRecommendation[];
+};
+
+export type AiStudyReportPayload = {
+  subject: { id: string; name: string };
+  group: { id: string; name: string };
+  generatedAt: string;
+  overallGrade: "strong" | "adequate" | "needs_work" | "critical";
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  studyPlan: StudyPlanStep[];
+  topicBreakdown: Array<{
+    topic: string;
+    scorePct: number | null;
+    missCount: number;
+    status: "mastered" | "solid" | "shaky" | "weak";
+    readings: StudentReaderRecommendation[];
+  }>;
+  suggestedRetakes: Array<{
+    assessmentVersionId: string;
+    title: string;
+    type: AssessmentCategory;
+    latestScorePct: number | null;
+    reason: string;
+    assessmentLink: string;
+  }>;
+  aiNarrative: string;
+};
+
+function gradeFromAverage(avg: number | null, riskLevel: string): AiStudyReportPayload["overallGrade"] {
+  if (riskLevel === "at_risk") return "critical";
+  if (avg === null) return "needs_work";
+  if (avg >= 85) return "strong";
+  if (avg >= 65) return "adequate";
+  return "needs_work";
+}
+
+function topicStatus(scorePct: number | null, missCount: number): "mastered" | "solid" | "shaky" | "weak" {
+  if (scorePct === null) return "shaky";
+  if (missCount === 0 && scorePct >= 85) return "mastered";
+  if (scorePct >= 75) return "solid";
+  if (scorePct >= 50) return "shaky";
+  return "weak";
+}
+
+export async function buildStudentAiReport(studentId: string, groupId: string): Promise<AiStudyReportPayload> {
+  const group = getGroup(groupId);
+  if (!group) {
+    const err = new Error("Group not found") as Error & { statusCode?: number; code?: string };
+    err.statusCode = 404;
+    err.code = "GROUP_NOT_FOUND";
+    throw err;
+  }
+  const subject = getSubject(group.subjectId);
+  if (!subject) {
+    const err = new Error("Subject not found") as Error & { statusCode?: number; code?: string };
+    err.statusCode = 404;
+    err.code = "SUBJECT_NOT_FOUND";
+    throw err;
+  }
+
+  const versions = listPublishedVersionsForGroup(groupId);
+  const attempts = listStudentAttemptsInGroup(studentId, groupId);
+  const snapshot = computeRiskFeatureSnapshot(studentId, groupId);
+  const classification = classifyRiskFromSnapshot(snapshot);
+
+  const attemptsByVersionId = new Map<string, AttemptRecord[]>();
+  for (const row of attempts) {
+    const existing = attemptsByVersionId.get(row.versionId) ?? [];
+    existing.push(row.attempt);
+    attemptsByVersionId.set(row.versionId, existing);
+  }
+
+  const allScores = attempts.map((row) => scorePct(row.attempt));
+  const overallAvg = average(allScores);
+  const recentAvg = average(allScores.slice(-5));
+
+  const topicBreakdown: AiStudyReportPayload["topicBreakdown"] = [];
+  const studyPlan: StudyPlanStep[] = [];
+  const strengths: string[] = [];
+  const weaknesses: string[] = [];
+  let stepPriority = 1;
+
+  for (const version of versions) {
+    const versionAttempts = attemptsByVersionId.get(version.id) ?? [];
+    if (versionAttempts.length === 0) continue;
+
+    let missCount = 0;
+    let totalItems = 0;
+    const missedStems: string[] = [];
+
+    for (const attempt of versionAttempts) {
+      for (const result of attempt.itemResults) {
+        totalItems += 1;
+        if (!result.correct) {
+          missCount += 1;
+          const item = version.items.find((entry) => entry.id === result.itemId);
+          if (item?.stem) missedStems.push(item.stem);
+        }
+      }
+    }
+
+    const versionScorePct = totalItems > 0 ? Math.round(((totalItems - missCount) / totalItems) * 1000) / 10 : null;
+    const status = topicStatus(versionScorePct, missCount);
+
+    const readings = await recommendReadings({
+      subjectId: subject.id,
+      groupId,
+      query: `${subject.name} ${version.title} ${missedStems.slice(0, 3).join(" ")}`.trim(),
+      topK: 3,
+    });
+
+    topicBreakdown.push({
+      topic: version.title,
+      scorePct: versionScorePct,
+      missCount,
+      status,
+      readings,
+    });
+
+    if (status === "mastered" || status === "solid") {
+      strengths.push(`${version.title} (${versionScorePct}%)`);
+    }
+
+    if (status === "shaky" || status === "weak") {
+      weaknesses.push(`${version.title}: ${missCount} missed items`);
+
+      if (readings.length > 0) {
+        studyPlan.push({
+          id: `read:${version.id}`,
+          priority: stepPriority++,
+          action: "read",
+          title: `Review material for ${version.title}`,
+          reason: `You missed ${missCount} item(s). The linked textbook sections cover the concepts tested.`,
+          readerLink: readings[0]?.readerPath,
+          estimatedMinutes: Math.max(10, missCount * 5),
+          readings,
+        });
+      }
+
+      const matchedAssessment = versions.find((v) => v.id === version.id);
+      if (matchedAssessment && isScheduleOpen(matchedAssessment)) {
+        studyPlan.push({
+          id: `redo:${version.id}`,
+          priority: stepPriority++,
+          action: "redo",
+          title: `Retake ${version.title}`,
+          reason: "After reviewing the material, attempt this again to check if the weak spots are fixed.",
+          assessmentLink: `/student/assessments/take/${version.id}`,
+          estimatedMinutes: 15,
+          readings: [],
+        });
+      }
+    }
+  }
+
+  topicBreakdown.sort((a, b) => (a.scorePct ?? 0) - (b.scorePct ?? 0));
+
+  const suggestedRetakes: AiStudyReportPayload["suggestedRetakes"] = [];
+  for (const version of versions) {
+    const versionAttempts = attemptsByVersionId.get(version.id) ?? [];
+    if (versionAttempts.length === 0) continue;
+    const latestAttempt = versionAttempts[versionAttempts.length - 1]!;
+    const score = scorePct(latestAttempt);
+    if (score < 70 && isScheduleOpen(version)) {
+      suggestedRetakes.push({
+        assessmentVersionId: version.id,
+        title: version.title,
+        type: inferAssessmentCategory(version.title),
+        latestScorePct: score,
+        reason: `Your latest score was ${score}%. Retaking after reviewing the material can solidify understanding.`,
+        assessmentLink: `/student/assessments/take/${version.id}`,
+      });
+    }
+  }
+
+  const overallGrade = gradeFromAverage(overallAvg, classification.level);
+
+  let aiNarrative = "";
+  if (hasOpenAI() && attempts.length > 0) {
+    const context = {
+      subject: subject.name,
+      overallAvg,
+      recentAvg,
+      riskLevel: classification.level,
+      trend: snapshot.features.trendLabel,
+      weakTopics: topicBreakdown.filter((t) => t.status === "weak" || t.status === "shaky").map((t) => t.topic),
+      strongTopics: topicBreakdown.filter((t) => t.status === "mastered" || t.status === "solid").map((t) => t.topic),
+      attemptCount: attempts.length,
+    };
+    const system =
+      "You are a supportive study advisor for a student. Given their performance data, write 3-4 sentences of personalized, encouraging guidance. " +
+      "Focus on what to study next and how to improve. Do not predict grades. Be specific about which topics need work. Keep it concise.";
+    const raw = await briefCompletion(system, JSON.stringify(context));
+    if (raw) aiNarrative = raw.trim();
+  }
+
+  if (!aiNarrative) {
+    const parts: string[] = [];
+    if (overallGrade === "critical") {
+      parts.push(`Your performance in ${subject.name} needs urgent attention.`);
+    } else if (overallGrade === "needs_work") {
+      parts.push(`Your work in ${subject.name} shows room for improvement.`);
+    } else if (overallGrade === "adequate") {
+      parts.push(`You are making solid progress in ${subject.name}.`);
+    } else {
+      parts.push(`Excellent work in ${subject.name}!`);
+    }
+    if (weaknesses.length > 0) {
+      parts.push(`Focus your next study session on: ${weaknesses.slice(0, 3).join(", ")}.`);
+    }
+    if (strengths.length > 0) {
+      parts.push(`Your strongest areas are: ${strengths.slice(0, 3).join(", ")}.`);
+    }
+    parts.push("Use the study plan below to work through the recommended readings and retakes in order.");
+    aiNarrative = parts.join(" ");
+  }
+
+  const summary = [
+    overallAvg !== null ? `Overall average: ${overallAvg}%` : "No scores yet",
+    `Trend: ${snapshot.features.trendLabel}`,
+    `Risk: ${classification.level.replace("_", " ")}`,
+    `${attempts.length} attempts recorded`,
+  ].join(" | ");
+
+  return {
+    subject: { id: subject.id, name: subject.name },
+    group: { id: group.id, name: group.name },
+    generatedAt: new Date().toISOString(),
+    overallGrade,
+    summary,
+    strengths,
+    weaknesses,
+    studyPlan: studyPlan.slice(0, 10),
+    topicBreakdown,
+    suggestedRetakes: suggestedRetakes.slice(0, 5),
+    aiNarrative,
   };
 }
