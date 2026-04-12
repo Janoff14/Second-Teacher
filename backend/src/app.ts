@@ -32,7 +32,12 @@ export function createApp() {
       customSuccessMessage: () => "request_completed",
     }),
   );
-  app.use(helmet());
+  app.use(
+    helmet({
+      // Default is `same-origin`, which blocks cross-origin `fetch` from the Next.js app.
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+    }),
+  );
   app.use(
     cors({
       origin: env.CORS_ORIGIN.split(",").map((origin) => origin.trim()),
