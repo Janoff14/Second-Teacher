@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { logger } from "../config/logger";
 import { embedTexts, hasOpenAI, EMBEDDING_DIM } from "../lib/openai";
+import { getSupabaseServiceRoleClient } from "../lib/supabase";
 import type { AssessmentVersion } from "./assessmentStore";
 
 export type ChunkSourceType = "textbook" | "assessment_version";
@@ -74,6 +76,10 @@ const chunks: CorpusChunk[] = [];
 const textbookReaderDocuments = new Map<string, TextbookReaderDocument>();
 let textbookSourceCounter = 1;
 let chunkCounter = 1;
+
+function db() {
+  return getSupabaseServiceRoleClient();
+}
 
 const PSEUDO_DIM = 48;
 
@@ -286,6 +292,101 @@ async function embed(texts: string[]): Promise<number[][]> {
   return texts.map((t) => pseudoEmbed(t));
 }
 
+/**
+ * Load all textbook sources, reader docs, and chunks from Supabase into
+ * in-memory arrays. Called once at startup. Returns the number of sources loaded.
+ */
+export async function loadTextbooksFromDb(): Promise<number> {
+  const client = db();
+  if (!client) return 0;
+
+  const { data: sourceRows, error: srcErr } = await client
+    .from("textbook_sources")
+    .select("*");
+  if (srcErr) {
+    logger.error({ err: srcErr }, "supabase_load_textbook_sources_failed");
+    return 0;
+  }
+  if (!sourceRows || sourceRows.length === 0) return 0;
+
+  for (const row of sourceRows) {
+    const record: TextbookSourceRecord = {
+      id: row.id,
+      subjectId: row.subject_id,
+      title: row.title,
+      versionLabel: row.version_label,
+      createdBy: row.created_by,
+      createdAt: row.created_at,
+      ...(row.original_file_name ? { originalFileName: row.original_file_name } : {}),
+      ...(row.source_format ? { sourceFormat: row.source_format } : {}),
+    };
+    textbookSources.push(record);
+
+    const num = parseInt(record.id.replace("tbs_", ""), 10);
+    if (!isNaN(num) && num >= textbookSourceCounter) {
+      textbookSourceCounter = num + 1;
+    }
+  }
+
+  const { data: readerRows, error: readerErr } = await client
+    .from("textbook_reader_docs")
+    .select("*");
+  if (readerErr) {
+    logger.error({ err: readerErr }, "supabase_load_textbook_reader_docs_failed");
+  } else if (readerRows) {
+    for (const row of readerRows) {
+      textbookReaderDocuments.set(row.source_id, {
+        sourceId: row.source_id,
+        chapters: row.chapters as TextbookChapterRecord[],
+        paragraphs: row.paragraphs as TextbookParagraphRecord[],
+      });
+    }
+  }
+
+  const { data: chunkRows, error: chunkErr } = await client
+    .from("textbook_chunks")
+    .select("*");
+  if (chunkErr) {
+    logger.error({ err: chunkErr }, "supabase_load_textbook_chunks_failed");
+  } else if (chunkRows) {
+    for (const row of chunkRows) {
+      const chunk: CorpusChunk = {
+        id: row.id,
+        sourceType: "textbook",
+        textbookSourceId: row.textbook_source_id,
+        subjectId: row.subject_id,
+        visibility: "subject",
+        chunkIndex: row.chunk_index,
+        text: row.body,
+        embedding: row.embedding as number[],
+        citationAnchor: row.citation_anchor,
+        active: row.active,
+      };
+      if (row.textbook_location != null) {
+        chunk.textbookLocation = row.textbook_location as TextbookCitationLocation;
+      }
+      if (row.reader_path != null) {
+        chunk.readerPath = row.reader_path;
+      }
+      if (row.highlight_text != null) {
+        chunk.highlightText = row.highlight_text;
+      }
+      chunks.push(chunk);
+
+      const num = parseInt(row.id.replace("chk_", ""), 10);
+      if (!isNaN(num) && num >= chunkCounter) {
+        chunkCounter = num + 1;
+      }
+    }
+  }
+
+  logger.info(
+    { sources: sourceRows.length, readerDocs: readerRows?.length ?? 0, chunks: chunkRows?.length ?? 0 },
+    "textbooks_loaded_from_supabase",
+  );
+  return sourceRows.length;
+}
+
 async function runWithRetry<T>(label: string, attempts: number, fn: () => Promise<T>): Promise<T> {
   let last: unknown;
   for (let i = 0; i < attempts; i++) {
@@ -321,9 +422,11 @@ async function ingestTextbookCore(params: {
   originalFileName?: string;
   sourceFormat?: "pdf" | "docx" | "doc" | "txt";
 }): Promise<{ source: TextbookSourceRecord; chunksCreated: number }> {
+  const client = db();
   const now = new Date().toISOString();
+  const sourceId = client ? `tbs_${randomUUID()}` : `tbs_${textbookSourceCounter++}`;
   const source: TextbookSourceRecord = {
-    id: `tbs_${textbookSourceCounter++}`,
+    id: sourceId,
     subjectId: params.subjectId,
     title: params.title,
     versionLabel: params.versionLabel,
@@ -350,11 +453,12 @@ async function ingestTextbookCore(params: {
   );
   const embeddings = await embed(pieces.map((p) => p.text));
 
-  let created = 0;
+  const newChunks: CorpusChunk[] = [];
   for (let i = 0; i < pieces.length; i++) {
     const piece = pieces[i]!;
-    chunks.push({
-      id: `chk_${chunkCounter++}`,
+    const chunkId = client ? `chk_${randomUUID()}` : `chk_${chunkCounter++}`;
+    const chunk: CorpusChunk = {
+      id: chunkId,
       sourceType: "textbook",
       textbookSourceId: source.id,
       subjectId: params.subjectId,
@@ -367,11 +471,60 @@ async function ingestTextbookCore(params: {
       readerPath: piece.readerPath,
       highlightText: piece.text,
       active: true,
-    });
-    created += 1;
+    };
+    newChunks.push(chunk);
+    chunks.push(chunk);
   }
 
-  return { source, chunksCreated: created };
+  if (client) {
+    const { error: srcErr } = await client.from("textbook_sources").insert({
+      id: source.id,
+      subject_id: source.subjectId,
+      title: source.title,
+      version_label: source.versionLabel,
+      created_by: source.createdBy,
+      created_at: source.createdAt,
+      original_file_name: source.originalFileName ?? null,
+      source_format: source.sourceFormat ?? null,
+    });
+    if (srcErr) {
+      logger.error({ err: srcErr, sourceId: source.id }, "supabase_insert_textbook_source_failed");
+    }
+
+    const { error: readerErr } = await client.from("textbook_reader_docs").insert({
+      source_id: source.id,
+      chapters: readerDoc.chapters,
+      paragraphs: readerDoc.paragraphs,
+    });
+    if (readerErr) {
+      logger.error({ err: readerErr, sourceId: source.id }, "supabase_insert_textbook_reader_doc_failed");
+    }
+
+    const CHUNK_BATCH = 200;
+    for (let i = 0; i < newChunks.length; i += CHUNK_BATCH) {
+      const batch = newChunks.slice(i, i + CHUNK_BATCH).map((c) => ({
+        id: c.id,
+        textbook_source_id: c.textbookSourceId!,
+        subject_id: c.subjectId,
+        chunk_index: c.chunkIndex,
+        body: c.text,
+        embedding: c.embedding,
+        citation_anchor: c.citationAnchor,
+        textbook_location: c.textbookLocation ?? null,
+        reader_path: c.readerPath ?? null,
+        highlight_text: c.highlightText ?? null,
+        active: c.active,
+      }));
+      const { error: chunkErr } = await client.from("textbook_chunks").insert(batch);
+      if (chunkErr) {
+        logger.error({ err: chunkErr, sourceId: source.id, batch: i }, "supabase_insert_textbook_chunks_failed");
+      }
+    }
+
+    logger.info({ sourceId: source.id, chunks: newChunks.length }, "textbook_persisted_to_supabase");
+  }
+
+  return { source, chunksCreated: newChunks.length };
 }
 
 export function supersedeAssessmentChunksForDraft(draftId: string, keepVersionId: string): void {

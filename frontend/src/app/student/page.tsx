@@ -153,12 +153,29 @@ export default function StudentDashboardPage() {
                 </div>
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+              {item.textbooks.length > 0 ? (
+                <div className="mt-4 space-y-2">
+                  <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                    Course materials
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {item.textbooks.map((tb) => (
+                      <span
+                        key={tb.id}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-200"
+                      >
+                        <svg className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                        {tb.title}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mt-3 flex flex-wrap gap-2 text-sm text-neutral-600 dark:text-neutral-400">
                 <span>{item.summary.upcomingCount} upcoming</span>
                 <span aria-hidden="true">•</span>
                 <span>{item.summary.insightCount} active insight{item.summary.insightCount === 1 ? "" : "s"}</span>
-                <span aria-hidden="true">•</span>
-                <span>{item.summary.textbookCount} textbook{item.summary.textbookCount === 1 ? "" : "s"}</span>
               </div>
             </Link>
           ))}

@@ -50,7 +50,7 @@ const BRIEFING_MODEL = "gpt-4o-mini";
 /**
  * Short teacher-facing copy; returns null if no API key or on failure.
  */
-export async function briefCompletion(system: string, user: string): Promise<string | null> {
+export async function briefCompletion(system: string, user: string, maxTokens = 400): Promise<string | null> {
   const client = getOpenAIClient();
   if (!client) return null;
   try {
@@ -60,7 +60,7 @@ export async function briefCompletion(system: string, user: string): Promise<str
         { role: "system", content: system },
         { role: "user", content: user },
       ],
-      max_completion_tokens: 400,
+      max_completion_tokens: maxTokens,
     });
     const text = resp.choices[0]?.message?.content?.trim();
     return text && text.length > 0 ? text : null;

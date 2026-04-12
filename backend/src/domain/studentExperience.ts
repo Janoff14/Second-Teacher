@@ -40,6 +40,11 @@ export type StudentAcademicScopeItem = {
     insightCount: number;
     textbookCount: number;
   };
+  textbooks: Array<{
+    id: string;
+    title: string;
+    readerPath: string;
+  }>;
 };
 
 export type StudentReaderRecommendation = {
@@ -339,6 +344,7 @@ export async function buildStudentAcademicScope(studentId: string): Promise<Stud
     const snapshot = computeRiskFeatureSnapshot(studentId, groupId);
     const classification = classifyRiskFromSnapshot(snapshot);
 
+    const textbookSources = listTextbookSourcesForSubject(subject.id);
     items.push({
       subject: { id: subject.id, name: subject.name },
       group: { id: group.id, name: group.name },
@@ -348,8 +354,13 @@ export async function buildStudentAcademicScope(studentId: string): Promise<Stud
         latestScorePct: latestAttempt ? scorePct(latestAttempt) : null,
         riskLevel: classification.level,
         insightCount: insights.length,
-        textbookCount: listTextbookSourcesForSubject(subject.id).length,
+        textbookCount: textbookSources.length,
       },
+      textbooks: textbookSources.map((source) => ({
+        id: source.id,
+        title: source.title,
+        readerPath: `/reader/textbooks/${source.id}?groupId=${encodeURIComponent(group.id)}`,
+      })),
     });
   }
 

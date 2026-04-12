@@ -79,27 +79,50 @@ export default function TeacherAssessmentsPage() {
 
       <ErrorBox message={error} />
 
-      <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
-          Yangi qoralama
-        </h2>
-        <form onSubmit={handleCreate} className="mt-3 flex flex-wrap gap-2">
-          <input
-            placeholder="Sarlavha (ixtiyoriy)"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="min-w-[200px] flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
-            disabled={loading}
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
+      <div className="grid gap-4 sm:grid-cols-2">
+        <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
+          <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
+            Yangi qoralama
+          </h2>
+          <p className="mt-1 text-xs text-neutral-500">
+            Savollarni qo&apos;lda yozing
+          </p>
+          <form onSubmit={handleCreate} className="mt-3 flex flex-wrap gap-2">
+            <input
+              placeholder="Sarlavha (ixtiyoriy)"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="min-w-[200px] flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+              disabled={loading}
+            />
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
+            >
+              Qoralama yaratish
+            </button>
+          </form>
+        </section>
+
+        <section className="rounded-lg border border-violet-200 bg-violet-50/50 p-4 dark:border-violet-900/50 dark:bg-violet-950/20">
+          <h2 className="text-sm font-semibold text-violet-900 dark:text-violet-200">
+            AI bilan test yaratish
+          </h2>
+          <p className="mt-1 text-xs text-violet-700 dark:text-violet-400">
+            Darslikdan mavzu tanlang — AI savollarni avtomatik yaratadi
+          </p>
+          <Link
+            href="/teacher/assessments/ai-generate"
+            className="mt-3 inline-flex items-center gap-2 rounded-md bg-violet-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-600 dark:bg-violet-600 dark:hover:bg-violet-500"
           >
-            Qoralama yaratish
-          </button>
-        </form>
-      </section>
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
+            </svg>
+            AI bilan yaratish
+          </Link>
+        </section>
+      </div>
 
       <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
         <div className="flex flex-wrap items-end justify-between gap-3">

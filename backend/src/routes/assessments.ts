@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { canTeacherManageGroup, getGroup, isStudentInGroup, listEnrollmentsForGroup } from "../domain/academicStore";
+import { canTeacherManageGroup, canTeacherAccessSubject, getGroup, isStudentInGroup, listEnrollmentsForGroup } from "../domain/academicStore";
 import {
   createDraft,
   getDraft,
@@ -22,10 +22,17 @@ import {
   listInsightsForTeacher,
 } from "../domain/insightsStore";
 import { enrichTeacherBriefingWithOptionalLLM } from "../domain/agentOrchestrator";
-import { indexPublishedAssessmentVersion } from "../domain/ragStore";
+import { computePercentileProfile } from "../domain/percentileProfile";
+import { indexPublishedAssessmentVersion, getTextbookSourceById } from "../domain/ragStore";
 import { buildTeacherBriefingPayload } from "../domain/teacherBriefing";
 import { appendAuditLog } from "../domain/auditStore";
 import { getUserById } from "../domain/userStore";
+import {
+  generateTestFromTextbook,
+  listTextbookTopics,
+  getTextbookSource,
+  generateStudyRecommendations,
+} from "../domain/testGenerator";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 
@@ -113,6 +120,147 @@ assessmentsRouter.get("/assessments/drafts/:draftId", requireAuth, requireRole([
     next(e);
   }
 });
+
+const aiGenerateSchema = z.object({
+  groupId: z.string().min(1),
+  textbookSourceId: z.string().min(1),
+  topics: z.array(z.string().min(1)).min(1),
+  questionCount: z.number().int().min(1).max(30).optional(),
+  difficulty: z.enum(["easy", "medium", "hard"]).optional(),
+  title: z.string().min(1).optional(),
+});
+
+assessmentsRouter.post(
+  "/assessments/ai-generate",
+  requireAuth,
+  requireRole(["admin", "teacher"]),
+  validateBody(aiGenerateSchema),
+  async (req, res, next) => {
+    try {
+      const user = req.user!;
+      const body = req.body as z.infer<typeof aiGenerateSchema>;
+      if (!canTeacherManageGroup(user.userId, user.role, body.groupId)) {
+        const err = new Error("Forbidden for this group") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 403;
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+      const group = getGroup(body.groupId);
+      if (!group) {
+        const err = new Error("Group not found") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 404;
+        err.code = "GROUP_NOT_FOUND";
+        throw err;
+      }
+      const textbook = getTextbookSource(body.textbookSourceId, group.subjectId);
+      if (!textbook) {
+        const err = new Error("Textbook not found for this subject") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 404;
+        err.code = "TEXTBOOK_NOT_FOUND";
+        throw err;
+      }
+
+      const questionCount = body.questionCount ?? 5;
+      const result = await generateTestFromTextbook({
+        subjectId: group.subjectId,
+        groupId: body.groupId,
+        textbookSourceId: body.textbookSourceId,
+        topics: body.topics,
+        questionCount,
+        difficulty: body.difficulty,
+      });
+
+      if (result.items.length === 0) {
+        const err = new Error("Could not generate questions from the selected topics. Try broader topics or a different textbook.") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 422;
+        err.code = "GENERATION_FAILED";
+        throw err;
+      }
+
+      const title = body.title?.trim() || `AI: ${body.topics.slice(0, 3).join(", ")}`;
+      const draft = createDraft(body.groupId, title, user.userId);
+      const draftItems = result.items.map((item) => ({
+        stem: item.stem,
+        options: item.options,
+        correctKey: item.correctKey,
+      }));
+      setDraftItems(draft.id, draftItems);
+
+      appendAuditLog({
+        ...(req.requestId !== undefined ? { requestId: req.requestId } : {}),
+        actorId: user.userId,
+        actorRole: user.role,
+        action: "ai_generate_assessment",
+        groupId: body.groupId,
+        targetId: draft.id,
+        detail: `AI generated ${result.items.length} questions from textbook ${textbook.title}`,
+        meta: {
+          textbookSourceId: body.textbookSourceId,
+          topics: body.topics,
+          questionCount: result.items.length,
+          chunksRetrieved: result.chunksRetrieved,
+        },
+      });
+
+      const updatedDraft = getDraft(draft.id);
+      res.status(201).json({
+        data: {
+          draft: updatedDraft,
+          generation: {
+            itemsGenerated: result.items.length,
+            topicsUsed: result.topicsUsed,
+            chunksRetrieved: result.chunksRetrieved,
+            textbookTitle: textbook.title,
+          },
+        },
+      });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+assessmentsRouter.get(
+  "/assessments/textbook-topics",
+  requireAuth,
+  requireRole(["admin", "teacher"]),
+  (req, res, next) => {
+    try {
+      const textbookSourceId = typeof req.query.textbookSourceId === "string" ? req.query.textbookSourceId : "";
+      const subjectId = typeof req.query.subjectId === "string" ? req.query.subjectId : "";
+      if (!textbookSourceId || !subjectId) {
+        const err = new Error("textbookSourceId and subjectId are required") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 400;
+        err.code = "VALIDATION_ERROR";
+        throw err;
+      }
+      const user = req.user!;
+      if (!canTeacherAccessSubject(user.userId, user.role, subjectId)) {
+        const err = new Error("Forbidden for this subject") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 403;
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+      const textbook = getTextbookSourceById(textbookSourceId);
+      if (!textbook || textbook.subjectId !== subjectId) {
+        const err = new Error("Textbook not found") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 404;
+        err.code = "TEXTBOOK_NOT_FOUND";
+        throw err;
+      }
+      const topics = listTextbookTopics(textbookSourceId);
+      res.status(200).json({
+        data: {
+          textbookSourceId,
+          textbookTitle: textbook.title,
+          topics,
+        },
+      });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
 
 const draftItemsSchema = z.object({
   items: z
@@ -489,6 +637,30 @@ assessmentsRouter.get(
 );
 
 assessmentsRouter.get(
+  "/groups/:groupId/students/:studentId/percentile-profile",
+  requireAuth,
+  requireRole(["admin", "teacher"]),
+  (req, res, next) => {
+    try {
+      const groupId = req.params.groupId as string;
+      const studentId = req.params.studentId as string;
+      if (!groupId || !studentId) throw new Error("groupId and studentId required");
+      const user = req.user!;
+      if (!canTeacherManageGroup(user.userId, user.role, groupId)) {
+        const err = new Error("Forbidden") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 403;
+        err.code = "FORBIDDEN";
+        throw err;
+      }
+      const data = computePercentileProfile(studentId, groupId);
+      res.status(200).json({ data });
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+assessmentsRouter.get(
   "/assessments/attempts/me",
   requireAuth,
   requireRole(["student"]),
@@ -616,7 +788,7 @@ assessmentsRouter.post(
   requireAuth,
   requireRole(["student"]),
   validateBody(attemptSchema),
-  (req, res, next) => {
+  async (req, res, next) => {
     try {
       const versionId = req.params.versionId;
       if (!versionId || Array.isArray(versionId)) {
@@ -648,7 +820,43 @@ assessmentsRouter.post(
         detail: `Assessment attempt submitted`,
         meta: { versionId, totalScore: attempt.totalScore, maxScore: attempt.maxScore },
       });
-      res.status(201).json({ data: attempt });
+
+      const group = getGroup(version.groupId);
+      let studyRecommendations: Awaited<ReturnType<typeof generateStudyRecommendations>> = [];
+
+      if (group) {
+        const wrongItems = attempt.itemResults
+          .filter((r) => !r.correct)
+          .map((r) => {
+            const item = version.items.find((i) => i.id === r.itemId);
+            return {
+              itemId: r.itemId,
+              stem: item?.stem ?? "",
+              selectedKey: r.selectedKey,
+              correctKey: item?.correctKey ?? "",
+              correctAnswer: item ? (item.options[item.correctKey] ?? "") : "",
+            };
+          });
+
+        if (wrongItems.length > 0) {
+          try {
+            studyRecommendations = await generateStudyRecommendations({
+              wrongItems,
+              subjectId: group.subjectId,
+              groupId: version.groupId,
+            });
+          } catch (recErr) {
+            // Non-critical: log and continue without recommendations
+          }
+        }
+      }
+
+      res.status(201).json({
+        data: {
+          ...attempt,
+          studyRecommendations,
+        },
+      });
     } catch (e) {
       next(e);
     }

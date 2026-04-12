@@ -1,6 +1,7 @@
 import { createApp } from "./app";
 import { env } from "./config/env";
 import { logger } from "./config/logger";
+import { loadTextbooksFromDb } from "./domain/ragStore";
 import { loadUsersFromDb, seedDefaultUsers } from "./domain/userStore";
 import { runDemoDatasetSeedIfEnabled } from "./seed/demoDataset";
 
@@ -9,6 +10,8 @@ const LISTEN_HOST = process.env.HOST ?? "0.0.0.0";
 async function start() {
   const loadedUsers = await loadUsersFromDb();
   logger.info({ loadedUsers }, "startup_users_loaded");
+  const loadedTextbooks = await loadTextbooksFromDb();
+  logger.info({ loadedTextbooks }, "startup_textbooks_loaded");
   await seedDefaultUsers();
   logger.info("startup_default_users_seeded");
   await runDemoDatasetSeedIfEnabled();

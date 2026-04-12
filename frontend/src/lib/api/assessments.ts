@@ -33,12 +33,27 @@ export type PublishedAssessment = {
   items?: AssessmentItem[];
 };
 
+export type StudyRecommendation = {
+  itemId: string;
+  stem: string;
+  selectedKey: string;
+  correctKey: string;
+  textbookSourceId?: string;
+  textbookTitle?: string;
+  chapterTitle?: string;
+  pageNumber?: number;
+  readerPath?: string;
+  highlightText?: string;
+  explanation?: string;
+};
+
 export type AttemptRecord = {
   id: string;
   publishedAssessmentId: string;
   submittedAt?: string;
   score?: number | null;
   answers?: Record<string, string>;
+  studyRecommendations?: StudyRecommendation[];
 };
 
 export type TeacherAssessmentResultRow = {
@@ -248,6 +263,48 @@ export async function getPublishedAssessment(publishedId: string) {
   };
 }
 
+/** --- AI test generation (teacher) --- */
+
+export type AiGenerateBody = {
+  groupId: string;
+  textbookSourceId: string;
+  topics: string[];
+  questionCount?: number;
+  difficulty?: "easy" | "medium" | "hard";
+  title?: string;
+};
+
+export type AiGenerateResult = {
+  draft: AssessmentDraft;
+  generation: {
+    itemsGenerated: number;
+    topicsUsed: string[];
+    chunksRetrieved: number;
+    textbookTitle: string;
+  };
+};
+
+export type TextbookTopicsResult = {
+  textbookSourceId: string;
+  textbookTitle: string;
+  topics: string[];
+};
+
+export async function aiGenerateTest(body: AiGenerateBody) {
+  return apiRequest<AiGenerateResult>("/assessments/ai-generate", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getTextbookTopics(textbookSourceId: string, subjectId: string) {
+  const q = new URLSearchParams({ textbookSourceId, subjectId });
+  return apiRequest<TextbookTopicsResult>(
+    `/assessments/textbook-topics?${q.toString()}`,
+    { method: "GET" },
+  );
+}
+
 /** --- Student attempts (J2.3) --- */
 
 export async function submitAttempt(
@@ -382,6 +439,31 @@ export type StudentProfile = {
 export async function getStudentProfile(groupId: string, studentId: string) {
   return apiRequest<StudentProfile>(
     `/groups/${groupId}/students/${studentId}/profile`,
+    { method: "GET" },
+  );
+}
+
+export type TeacherPercentileAxis =
+  | "quizAvg"
+  | "testAvg"
+  | "accuracy"
+  | "consistency"
+  | "completion"
+  | "improvement"
+  | "engagement"
+  | "bestScore";
+
+export type TeacherPercentileProfile = {
+  studentId: string;
+  groupId: string;
+  groupSize: number;
+  axes: Record<TeacherPercentileAxis, { percentile: number; rawValue: number | null }>;
+  minutesPlayed: number;
+};
+
+export async function getStudentPercentileProfile(groupId: string, studentId: string) {
+  return apiRequest<TeacherPercentileProfile>(
+    `/groups/${groupId}/students/${studentId}/percentile-profile`,
     { method: "GET" },
   );
 }

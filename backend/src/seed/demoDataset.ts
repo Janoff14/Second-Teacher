@@ -44,7 +44,13 @@ import {
   type AssessmentVersion,
 } from "../domain/assessmentStore";
 import { recomputeGroupInsightsForAllStudents, resetInsightsStoreForTest } from "../domain/insightsStore";
-import { indexPublishedAssessmentVersion, ingestTextbook, resetRagStoreForTest } from "../domain/ragStore";
+import {
+  indexPublishedAssessmentVersion,
+  ingestTextbook,
+  listTextbookSourcesForSubject,
+  loadTextbooksFromDb,
+  resetRagStoreForTest,
+} from "../domain/ragStore";
 import { createUser, getUserByEmail } from "../domain/userStore";
 import { resetRateLimitForTest } from "../middleware/rateLimit";
 
@@ -449,6 +455,7 @@ export async function seedDemoDataset(options?: SeedDemoDatasetOptions): Promise
   resetAssessmentStoreForTest();
   resetInsightsStoreForTest();
   resetRagStoreForTest();
+  await loadTextbooksFromDb();
   resetAuditStoreForTest();
   resetRateLimitForTest();
 
@@ -555,22 +562,30 @@ export async function seedDemoDataset(options?: SeedDemoDatasetOptions): Promise
     recomputeGroupInsightsForAllStudents(gid);
   }
 
-  try {
-    await ingestTextbook({
-      subjectId: subject.id,
-      title: "Physics Foundations Reader_demo",
-      versionLabel: "seed-1",
-      text:
-        "# Chapter 1: Motion and vectors\n" +
-        "Motion describes how an object's position changes over time. Students compare distance, displacement, speed, and velocity before moving into graph interpretation.\n\n" +
-        "A velocity-time graph can reveal steady motion, acceleration, or a change in direction. When the line slopes upward, the object is accelerating in the positive direction.\n\n" +
-        "# Chapter 2: Forces and energy\n" +
-        "Newton's laws connect force, mass, and acceleration. Free-body diagrams help students isolate the forces acting on an object before deciding how it will move.\n\n" +
-        "Energy is transferred when work is done. Students should review kinetic energy, gravitational potential energy, and conservation of energy before the larger unit tests.",
-      createdBy: teacher.id,
-    });
-  } catch (err) {
-    logger.warn({ err }, "demo_seed_textbook_ingest_failed_non_fatal");
+  const existingTextbooks = listTextbookSourcesForSubject(subject.id);
+  if (existingTextbooks.length > 0) {
+    logger.info(
+      { subjectId: subject.id, count: existingTextbooks.length },
+      "demo_seed_textbook_skipped_already_loaded_from_db",
+    );
+  } else {
+    try {
+      await ingestTextbook({
+        subjectId: subject.id,
+        title: "Physics Foundations Reader_demo",
+        versionLabel: "seed-1",
+        text:
+          "# Chapter 1: Motion and vectors\n" +
+          "Motion describes how an object's position changes over time. Students compare distance, displacement, speed, and velocity before moving into graph interpretation.\n\n" +
+          "A velocity-time graph can reveal steady motion, acceleration, or a change in direction. When the line slopes upward, the object is accelerating in the positive direction.\n\n" +
+          "# Chapter 2: Forces and energy\n" +
+          "Newton's laws connect force, mass, and acceleration. Free-body diagrams help students isolate the forces acting on an object before deciding how it will move.\n\n" +
+          "Energy is transferred when work is done. Students should review kinetic energy, gravitational potential energy, and conservation of energy before the larger unit tests.",
+        createdBy: teacher.id,
+      });
+    } catch (err) {
+      logger.warn({ err }, "demo_seed_textbook_ingest_failed_non_fatal");
+    }
   }
 
   const versionsPerSection = DEMO_ASSESSMENT_SPECS.length;

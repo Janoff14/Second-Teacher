@@ -5,9 +5,17 @@ import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AiStudyReportPanel } from "@/components/student/AiStudyReport";
 import { CategoryRadarChart } from "@/components/student/CategoryRadarChart";
+import {
+  PercentileRadarChart,
+  type PercentileProfileData,
+} from "@/components/student/PercentileRadarChart";
 import { StudentProgressChart } from "@/components/student/StudentProgressChart";
 import { StudyCoachPanel } from "@/components/student/StudyCoachPanel";
-import { getStudentWorkspace, type StudentWorkspace } from "@/lib/api/student";
+import {
+  getStudentWorkspace,
+  getStudentPercentileProfile,
+  type StudentWorkspace,
+} from "@/lib/api/student";
 import { useAuthStore } from "@/stores/auth-store";
 
 type TabId = "overview" | "practice" | "analytics" | "ai-report" | "library" | "coach";
@@ -100,6 +108,7 @@ export default function StudentSubjectWorkspacePage() {
   const setActiveGroupId = useAuthStore((state) => state.setActiveGroupId);
 
   const [workspace, setWorkspace] = useState<StudentWorkspace | null>(null);
+  const [percentileProfile, setPercentileProfile] = useState<PercentileProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("overview");
@@ -113,15 +122,21 @@ export default function StudentSubjectWorkspacePage() {
     async function load() {
       setLoading(true);
       setError(null);
-      const result = await getStudentWorkspace(groupId);
+      const [wsResult, ppResult] = await Promise.all([
+        getStudentWorkspace(groupId),
+        getStudentPercentileProfile(groupId),
+      ]);
       if (!alive) return;
       setLoading(false);
-      if (!result.ok) {
-        setError(result.error.message);
+      if (!wsResult.ok) {
+        setError(wsResult.error.message);
         setWorkspace(null);
         return;
       }
-      setWorkspace(result.data);
+      setWorkspace(wsResult.data);
+      if (ppResult.ok && ppResult.data) {
+        setPercentileProfile(ppResult.data as PercentileProfileData);
+      }
     }
     void load();
     return () => {
@@ -342,6 +357,38 @@ export default function StudentSubjectWorkspacePage() {
           </section>
 
           <section className="space-y-5">
+            {workspace.textbooks.length > 0 ? (
+              <div className="rounded-[2rem] border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+                <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-50">
+                  Course materials
+                </h2>
+                <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+                  Your textbooks for this subject. Click to open the reader.
+                </p>
+                <div className="mt-4 grid gap-3">
+                  {workspace.textbooks.map((textbook) => (
+                    <a
+                      key={textbook.id}
+                      href={textbook.readerPath}
+                      className="flex items-center gap-3 rounded-2xl border border-neutral-200 bg-neutral-50/80 px-4 py-3 transition hover:-translate-y-0.5 hover:border-blue-300 hover:shadow-sm dark:border-neutral-800 dark:bg-neutral-900/50 dark:hover:border-blue-800"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 dark:bg-blue-900/40">
+                        <svg className="h-5 w-5 text-blue-700 dark:text-blue-300" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                          {textbook.title}
+                        </p>
+                        <p className="mt-0.5 text-xs text-neutral-500">
+                          Version {textbook.versionLabel} · Added {new Date(textbook.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="rounded-[2rem] border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
               <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-50">
                 What the platform sees
@@ -588,6 +635,20 @@ export default function StudentSubjectWorkspacePage() {
             points={workspace.analytics.timeSeries}
             graphNarrative={workspace.analytics.graphNarrative}
           />
+
+          {percentileProfile ? (
+            <section className="rounded-[2rem] border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+              <h2 className="text-xl font-semibold text-neutral-900 dark:text-neutral-50">
+                Percentile profile
+              </h2>
+              <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+                How you compare to your {percentileProfile.groupSize} groupmates across key metrics.
+              </p>
+              <div className="mt-5">
+                <PercentileRadarChart profile={percentileProfile} />
+              </div>
+            </section>
+          ) : null}
 
           <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
             <div className="rounded-[2rem] border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">

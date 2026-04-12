@@ -14,9 +14,14 @@ import {
 } from "recharts";
 import {
   getStudentProfile,
+  getStudentPercentileProfile,
   type RiskFactorEvidence,
   type StudentProfile,
 } from "@/lib/api/assessments";
+import {
+  PercentileRadarChart,
+  type PercentileProfileData,
+} from "@/components/student/PercentileRadarChart";
 import { setInsightStatus } from "@/lib/api/insights";
 
 function ErrorBox({ message }: { message: string | null }) {
@@ -74,6 +79,7 @@ export default function TeacherStudentProfilePage() {
   const studentId = decodeURIComponent(params.studentId as string);
 
   const [profile, setProfile] = useState<StudentProfile | null>(null);
+  const [percentileProfile, setPercentileProfile] = useState<PercentileProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyInsight, setBusyInsight] = useState<string | null>(null);
@@ -81,7 +87,10 @@ export default function TeacherStudentProfilePage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const res = await getStudentProfile(groupId, studentId);
+    const [res, ppRes] = await Promise.all([
+      getStudentProfile(groupId, studentId),
+      getStudentPercentileProfile(groupId, studentId),
+    ]);
     setLoading(false);
     if (!res.ok) {
       setError(res.error.message);
@@ -89,6 +98,9 @@ export default function TeacherStudentProfilePage() {
       return;
     }
     setProfile(res.data ?? null);
+    if (ppRes.ok && ppRes.data) {
+      setPercentileProfile(ppRes.data as PercentileProfileData);
+    }
   }, [groupId, studentId]);
 
   useEffect(() => {
@@ -191,6 +203,23 @@ export default function TeacherStudentProfilePage() {
           </div>
         ) : null}
       </section>
+
+      {percentileProfile ? (
+        <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
+          <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
+            Percentile profile
+          </h2>
+          <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+            How this student compares to their {percentileProfile.groupSize} groupmates.
+          </p>
+          <div className="mt-4">
+            <PercentileRadarChart
+              profile={percentileProfile}
+              studentName={profile.displayName || profile.studentId}
+            />
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
         <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">Score trend</h2>

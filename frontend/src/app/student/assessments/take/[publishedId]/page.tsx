@@ -7,6 +7,7 @@ import {
   getPublishedAssessment,
   submitAttempt,
   type AssessmentItem,
+  type StudyRecommendation,
 } from "@/lib/api/assessments";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -24,6 +25,7 @@ export default function TakeAssessmentPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [result, setResult] = useState<{ score: number; maxScore: number; pct: number } | null>(null);
+  const [studyRecs, setStudyRecs] = useState<StudyRecommendation[]>([]);
 
   const backHref = activeGroupId ? `/student/subjects/${activeGroupId}` : "/student";
 
@@ -79,6 +81,9 @@ export default function TakeAssessmentPage() {
         pct: maxScore > 0 ? Math.round((score / maxScore) * 100) : 0,
       });
     }
+    if (data && Array.isArray(data.studyRecommendations)) {
+      setStudyRecs(data.studyRecommendations as StudyRecommendation[]);
+    }
   }
 
   if (loading) {
@@ -91,33 +96,95 @@ export default function TakeAssessmentPage() {
   }
 
   if (submitted) {
+    const recsWithLinks = studyRecs.filter((r) => r.readerPath);
     return (
-      <div className="mx-auto max-w-lg space-y-6 py-8">
+      <div className="mx-auto max-w-2xl space-y-6 py-8">
         <div className="rounded-[2rem] border border-emerald-200 bg-emerald-50 p-6 text-center shadow-sm dark:border-emerald-800/40 dark:bg-emerald-950/20">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40">
             <svg className="h-8 w-8 text-emerald-600 dark:text-emerald-300" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
           <h2 className="mt-4 text-2xl font-semibold text-emerald-900 dark:text-emerald-100">
-            Attempt submitted!
+            Javobingiz qabul qilindi!
           </h2>
           {result ? (
             <div className="mt-4">
               <p className="text-4xl font-bold text-emerald-800 dark:text-emerald-200">{result.pct}%</p>
               <p className="mt-1 text-sm text-emerald-700/70 dark:text-emerald-300/70">
-                {result.score} / {result.maxScore} points
+                {result.score} / {result.maxScore} ball
               </p>
             </div>
           ) : null}
           <p className="mt-4 text-sm text-emerald-800/80 dark:text-emerald-200/80">
-            Your attempt has been recorded. Check your subject workspace for updated analytics and AI recommendations.
+            Natijangiz saqlandi. Fan sahifangizda yangilangan tahlil va AI tavsiyalarni ko&apos;ring.
           </p>
         </div>
+
+        {recsWithLinks.length > 0 && (
+          <div className="rounded-[2rem] border border-amber-200 bg-amber-50/80 p-5 shadow-sm dark:border-amber-800/40 dark:bg-amber-950/20">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/40">
+                <svg className="h-5 w-5 text-amber-600 dark:text-amber-300" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-amber-900 dark:text-amber-100">
+                  Darslikdan o&apos;qish tavsiyalari
+                </h3>
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  Noto&apos;g&apos;ri javob bergan savollaringiz uchun darslikdagi tegishli bo&apos;limlar
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {recsWithLinks.map((rec, idx) => (
+                <div
+                  key={rec.itemId || idx}
+                  className="rounded-xl border border-amber-200 bg-white px-4 py-3 dark:border-amber-800/30 dark:bg-neutral-950/50"
+                >
+                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">
+                    {rec.stem.length > 120 ? `${rec.stem.slice(0, 120)}...` : rec.stem}
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    {rec.chapterTitle && (
+                      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                        {rec.chapterTitle}
+                        {rec.pageNumber ? ` — ${rec.pageNumber}-sahifa` : ""}
+                      </span>
+                    )}
+                    {rec.textbookTitle && (
+                      <span className="text-xs text-neutral-500">
+                        {rec.textbookTitle}
+                      </span>
+                    )}
+                  </div>
+                  {rec.highlightText && (
+                    <p className="mt-2 text-xs leading-5 text-neutral-600 dark:text-neutral-400">
+                      &ldquo;{rec.highlightText.slice(0, 200)}{rec.highlightText.length > 200 ? "..." : ""}&rdquo;
+                    </p>
+                  )}
+                  <Link
+                    href={rec.readerPath!}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-amber-500 dark:bg-amber-700 dark:hover:bg-amber-600"
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                    </svg>
+                    Darslikda ochish
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap justify-center gap-3">
           <Link
             href={backHref}
             className="rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white dark:bg-neutral-100 dark:text-neutral-900"
           >
-            Back to subject
+            Fanga qaytish
           </Link>
           <Link
             href={`/student/assessments/take/${publishedId}`}
@@ -125,11 +192,12 @@ export default function TakeAssessmentPage() {
               e.preventDefault();
               setSubmitted(false);
               setResult(null);
+              setStudyRecs([]);
               void load();
             }}
             className="rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-900"
           >
-            Retake
+            Qayta topshirish
           </Link>
         </div>
       </div>

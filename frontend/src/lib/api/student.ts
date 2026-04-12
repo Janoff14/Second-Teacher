@@ -11,6 +11,11 @@ export type StudentAcademicScopeItem = {
     insightCount: number;
     textbookCount: number;
   };
+  textbooks: Array<{
+    id: string;
+    title: string;
+    readerPath: string;
+  }>;
 };
 
 export type ReaderRecommendation = {
@@ -152,4 +157,29 @@ export async function getStudentAiReport(groupId: string) {
   return apiRequest<AiStudyReport>(`/student/groups/${groupId}/ai-report`, {
     method: "GET",
   });
+}
+
+export type PercentileAxis =
+  | "quizAvg"
+  | "testAvg"
+  | "accuracy"
+  | "consistency"
+  | "completion"
+  | "improvement"
+  | "engagement"
+  | "bestScore";
+
+export type PercentileProfile = {
+  studentId: string;
+  groupId: string;
+  groupSize: number;
+  axes: Record<PercentileAxis, { percentile: number; rawValue: number | null }>;
+  minutesPlayed: number;
+};
+
+export async function getStudentPercentileProfile(groupId: string) {
+  return apiRequest<PercentileProfile>(
+    `/student/groups/${groupId}/percentile-profile`,
+    { method: "GET" },
+  );
 }
