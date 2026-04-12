@@ -668,6 +668,60 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     expect(leak.status).toBe(403);
   });
 
+  it("stores uploaded textbook assets for the embedded reader and serves them back with auth", async () => {
+    const app = createApp();
+    const teacherLogin = await request(app)
+      .post("/auth/login")
+      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+    const teacherToken = teacherLogin.body.data.token as string;
+
+    const subjectRes = await request(app)
+      .post("/subjects")
+      .set("Authorization", `Bearer ${teacherToken}`)
+      .send({ name: "Reader Uploads" });
+    const subjectId = subjectRes.body.data.id as string;
+
+    const groupRes = await request(app)
+      .post("/groups")
+      .set("Authorization", `Bearer ${teacherToken}`)
+      .send({ subjectId, name: "Reader Group" });
+    const groupId = groupRes.body.data.id as string;
+
+    const uploadRes = await request(app)
+      .post("/rag/sources/textbooks/upload")
+      .set("Authorization", `Bearer ${teacherToken}`)
+      .field("subjectId", subjectId)
+      .field("title", "Reader Upload")
+      .field("versionLabel", "2026.2")
+      .attach("file", Buffer.from("Chapter 1\nCells store information.\n\nChapter 2\nCells divide."), {
+        filename: "reader-upload.txt",
+        contentType: "text/plain",
+      });
+
+    expect(uploadRes.status).toBe(201);
+    const sourceId = uploadRes.body.data.source.id as string;
+
+    const readerRes = await request(app)
+      .get(`/reader/textbooks/${sourceId}`)
+      .query({ groupId })
+      .set("Authorization", `Bearer ${teacherToken}`);
+    expect(readerRes.status).toBe(200);
+    expect(readerRes.body.data.asset.available).toBe(true);
+    expect(readerRes.body.data.asset.mimeType).toContain("text/plain");
+    expect(readerRes.body.data.asset.fileName).toBe("reader-upload.txt");
+    expect(readerRes.body.data.source.assetAvailable).toBe(true);
+
+    const assetRes = await request(app)
+      .get(`/reader/textbooks/${sourceId}/asset`)
+      .query({ groupId })
+      .set("Authorization", `Bearer ${teacherToken}`);
+    expect(assetRes.status).toBe(200);
+    expect(assetRes.headers["content-type"]).toContain("text/plain");
+    expect(assetRes.headers["content-disposition"]).toContain("inline");
+    expect(assetRes.text).toContain("Chapter 1");
+    expect(assetRes.text).toContain("Chapter 2");
+  });
+
   it("runs teacher and student agent chats with scoped tools, timeout fallback, and audit entries", async () => {
     const app = createApp();
     const teacherLogin = await request(app)

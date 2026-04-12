@@ -1,6 +1,7 @@
 import path from "node:path";
 import mammoth from "mammoth";
 import { PDFParse } from "pdf-parse";
+import type { TextbookOutlineEntry, TextbookPageText, TextbookReaderSeed } from "./textbookReader";
 
 type UploadedFileLike = {
   buffer: Buffer;
@@ -23,6 +24,7 @@ export interface ExtractedDocumentText {
   originalFileName: string;
   sourceFormat: "pdf" | "docx" | "doc" | "txt";
   suggestedTitle: string;
+  readerSeed?: TextbookReaderSeed;
 }
 
 function baseNameWithoutExtension(fileName: string): string {
@@ -62,6 +64,173 @@ function emptyExtractionError(fileName: string): never {
   throw err;
 }
 
+type PdfTextItemLike = {
+  str?: string;
+  transform?: number[];
+  hasEOL?: boolean;
+};
+
+type PdfOutlineItemLike = {
+  title?: string;
+  dest?: unknown;
+  items?: PdfOutlineItemLike[];
+};
+
+function normalizePdfPageText(input: string): string {
+  return input
+    .replace(/\u0000/g, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function renderPdfTextItems(items: PdfTextItemLike[]): string {
+  const lines: string[] = [];
+  let currentLine: string[] = [];
+  let lastY: number | null = null;
+
+  const flush = () => {
+    const line = currentLine.join(" ").replace(/\s{2,}/g, " ").trim();
+    if (line) {
+      lines.push(line);
+    }
+    currentLine = [];
+  };
+
+  for (const item of items) {
+    const y =
+      Array.isArray(item.transform) && typeof item.transform[5] === "number"
+        ? item.transform[5]
+        : lastY;
+    if (
+      currentLine.length > 0 &&
+      lastY !== null &&
+      typeof y === "number" &&
+      Math.abs(y - lastY) > 2.5
+    ) {
+      flush();
+    }
+
+    const text = typeof item.str === "string" ? item.str.replace(/\s+/g, " ").trim() : "";
+    if (text) {
+      currentLine.push(text);
+    }
+
+    if (item.hasEOL) {
+      flush();
+      lastY = null;
+      continue;
+    }
+
+    lastY = typeof y === "number" ? y : lastY;
+  }
+
+  if (currentLine.length > 0) {
+    flush();
+  }
+
+  return normalizePdfPageText(lines.join("\n"));
+}
+
+async function resolvePdfDestinationPageNumber(
+  pdfDocument: {
+    getDestination(dest: string): Promise<unknown>;
+    getPageIndex(ref: unknown): Promise<number>;
+  },
+  dest: unknown,
+): Promise<number | null> {
+  let destination = dest;
+  if (typeof destination === "string") {
+    destination = await pdfDocument.getDestination(destination);
+  }
+  if (!Array.isArray(destination) || destination.length === 0) {
+    return null;
+  }
+
+  const pageRef = destination[0];
+  if (typeof pageRef === "number" && Number.isFinite(pageRef)) {
+    return pageRef + 1;
+  }
+  if (pageRef && typeof pageRef === "object") {
+    const pageIndex = await pdfDocument.getPageIndex(pageRef);
+    return pageIndex + 1;
+  }
+  return null;
+}
+
+async function flattenPdfOutline(
+  pdfDocument: {
+    getDestination(dest: string): Promise<unknown>;
+    getPageIndex(ref: unknown): Promise<number>;
+  },
+  items: PdfOutlineItemLike[] | null | undefined,
+  depth = 0,
+  out: TextbookOutlineEntry[] = [],
+): Promise<TextbookOutlineEntry[]> {
+  if (!items?.length) {
+    return out;
+  }
+
+  for (const item of items) {
+    const title = typeof item.title === "string" ? item.title.replace(/\s+/g, " ").trim() : "";
+    try {
+      const pageNumber =
+        item.dest !== undefined
+          ? await resolvePdfDestinationPageNumber(pdfDocument, item.dest)
+          : null;
+      if (title && pageNumber !== null) {
+        out.push({ title, pageNumber, depth });
+      }
+    } catch {
+      // Ignore individual outline entries we cannot resolve.
+    }
+    if (item.items?.length) {
+      await flattenPdfOutline(pdfDocument, item.items, depth + 1, out);
+    }
+  }
+  return out;
+}
+
+async function extractPdfDocument(buffer: Buffer): Promise<{
+  text: string;
+  readerSeed: TextbookReaderSeed;
+}> {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(buffer),
+    isEvalSupported: false,
+    useSystemFonts: false,
+  });
+
+  try {
+    const pdfDocument = await loadingTask.promise;
+    const pageTexts: TextbookPageText[] = [];
+    for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+      const page = await pdfDocument.getPage(pageNumber);
+      const textContent = await page.getTextContent();
+      const pageText = renderPdfTextItems(textContent.items as PdfTextItemLike[]);
+      pageTexts.push({ pageNumber, text: pageText });
+    }
+
+    const outline = await flattenPdfOutline(
+      pdfDocument,
+      (await pdfDocument.getOutline()) as PdfOutlineItemLike[] | null | undefined,
+    );
+    const text = normalizeExtractedText(pageTexts.map((page) => page.text).filter(Boolean).join("\n\n"));
+
+    return {
+      text,
+      readerSeed: {
+        pageTexts,
+        outline,
+        totalPages: pdfDocument.numPages,
+      },
+    };
+  } finally {
+    await loadingTask.destroy();
+  }
+}
+
 async function extractPdfText(buffer: Buffer): Promise<string> {
   const parser = new PDFParse({ data: buffer });
   try {
@@ -89,12 +258,16 @@ export async function extractTextFromUploadedDocument(
   const ext = extensionOf(file.originalname);
   let rawText = "";
   let sourceFormat: ExtractedDocumentText["sourceFormat"];
+  let readerSeed: TextbookReaderSeed | undefined;
 
   switch (ext) {
-    case ".pdf":
+    case ".pdf": {
       sourceFormat = "pdf";
-      rawText = await extractPdfText(file.buffer);
+      const extracted = await extractPdfDocument(file.buffer);
+      rawText = extracted.text;
+      readerSeed = extracted.readerSeed;
       break;
+    }
     case ".docx":
       sourceFormat = "docx";
       rawText = await extractDocxText(file.buffer);
@@ -123,5 +296,6 @@ export async function extractTextFromUploadedDocument(
     originalFileName: file.originalname,
     sourceFormat,
     suggestedTitle: baseNameWithoutExtension(file.originalname),
+    ...(readerSeed ? { readerSeed } : {}),
   };
 }
