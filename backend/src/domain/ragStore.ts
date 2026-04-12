@@ -327,8 +327,8 @@ async function ingestTextbookCore(params: {
     await saveTextbookAsset({
       sourceId: source.id,
       buffer: params.assetBuffer,
-      originalFileName: params.originalFileName,
-      sourceFormat: params.sourceFormat,
+      ...(params.originalFileName ? { originalFileName: params.originalFileName } : {}),
+      ...(params.sourceFormat ? { sourceFormat: params.sourceFormat } : {}),
     });
   }
   textbookSources.push(source);

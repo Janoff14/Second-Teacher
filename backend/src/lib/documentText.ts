@@ -98,7 +98,7 @@ function renderPdfTextItems(items: PdfTextItemLike[]): string {
   };
 
   for (const item of items) {
-    const y =
+    const y: number | null =
       Array.isArray(item.transform) && typeof item.transform[5] === "number"
         ? item.transform[5]
         : lastY;

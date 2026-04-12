@@ -334,8 +334,8 @@ ragRouter.get("/reader/textbooks/:textbookSourceId", requireAuth, (req, res, nex
     const sentenceEnd = Number.isFinite(sentenceEndRaw) ? Math.max(sentenceStart ?? 1, sentenceEndRaw!) : undefined;
     const assetInfo = getTextbookAssetInfo({
       sourceId: source.id,
-      originalFileName: source.originalFileName,
-      sourceFormat: source.sourceFormat,
+      ...(source.originalFileName ? { originalFileName: source.originalFileName } : {}),
+      ...(source.sourceFormat ? { sourceFormat: source.sourceFormat } : {}),
     });
 
     res.status(200).json({
@@ -400,8 +400,8 @@ ragRouter.get("/reader/textbooks/:textbookSourceId/asset", requireAuth, (req, re
     const { source } = resolveReaderSourceAccess(user, groupId, textbookSourceId);
     const assetInfo = getTextbookAssetInfo({
       sourceId: source.id,
-      originalFileName: source.originalFileName,
-      sourceFormat: source.sourceFormat,
+      ...(source.originalFileName ? { originalFileName: source.originalFileName } : {}),
+      ...(source.sourceFormat ? { sourceFormat: source.sourceFormat } : {}),
     });
     if (!assetInfo) {
       const err = new Error("Original textbook file is unavailable for this reader") as Error & {
