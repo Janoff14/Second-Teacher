@@ -13,6 +13,7 @@ import { analyticsRouter } from "./routes/analytics";
 import { auditRouter } from "./routes/audit";
 import { assessmentsRouter } from "./routes/assessments";
 import { insightsRouter } from "./routes/insights";
+import { messagesRouter } from "./routes/messages";
 import { enrollmentRouter } from "./routes/enrollment";
 import { healthRouter } from "./routes/health";
 import { protectedRouter } from "./routes/protected";
@@ -55,6 +56,7 @@ export function createApp() {
   app.use(analyticsRouter);
   app.use(assessmentsRouter);
   app.use(insightsRouter);
+  app.use(messagesRouter);
   app.use(ragRouter);
   app.use(studentRouter);
   app.use(agentRouter);
