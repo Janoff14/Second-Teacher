@@ -16,15 +16,15 @@ export type MockScorePrediction = {
   min: number;
   max: number;
   passPct: number;
-  /** "Possibilities" — diapazonlar (mock) */
+  /** "Possibilities" — predicted ranges (mock) */
   averageRange: [number, number];
   medianRange: [number, number];
   passPctRange: [number, number];
 };
 
 /**
- * Demo/bashorat: haqiqiy backend yo‘q — savollar soni va tarkibidan
- * deterministik mock statistikalar (keyingi API almashtiriladi).
+ * Demo prediction: no real backend yet.
+ * Deterministic mock statistics from item count/content (to be replaced by API).
  */
 export function computeMockPredictions(
   items: DraftItemInput[],

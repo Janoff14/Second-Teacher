@@ -5,55 +5,54 @@ import { RoleEntryCards } from "@/components/workflow/RoleEntryCards";
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-b from-neutral-50 to-white dark:from-neutral-950 dark:to-neutral-900">
       <PublicNav />
-
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-dot-pattern opacity-40" />
-        <div className="absolute -left-40 -top-40 h-80 w-80 rounded-full bg-brand-400/20 blur-[100px]" />
-        <div className="absolute -right-40 top-20 h-96 w-96 rounded-full bg-violet-400/15 blur-[120px]" />
-        <div className="absolute bottom-0 left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-accent-400/15 blur-[80px]" />
-
-        <div className="relative mx-auto max-w-6xl px-5 pb-20 pt-16 md:pt-24">
-          <div className="mx-auto max-w-2xl text-center">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50/80 px-4 py-1.5 text-xs font-semibold text-brand-600 dark:border-brand-800 dark:bg-brand-950/50 dark:text-brand-300">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand-500 animate-pulse" />
-              AI-powered education platform
-            </div>
-            <h1 className="text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
-              Second<span className="text-gradient-brand">Teacher</span>
-            </h1>
-            <p className="mt-5 text-lg leading-relaxed text-foreground/70 md:text-xl">
-              O{"'"}qituvchi va talabalarga mo{"'"}ljallangan platforma: fan tuzilmasi, darslik
-              asosidagi qidiruv (RAG), baholash, insights va AI yordamchisi.
-            </p>
-            <p className="mt-3 text-sm text-foreground/60">
-              Demo tartibi va API ketma-ketligi{" "}
-              <Link
-                href="/guide"
-                className="font-semibold text-brand-500 underline-offset-2 hover:underline dark:text-brand-400"
-              >
-                platform workflow
-              </Link>{" "}
-              hujjati bilan moslashtirilgan.
-            </p>
-          </div>
-
-          <div className="mt-14">
-            <p className="mb-4 text-center text-xs font-bold uppercase tracking-[0.2em] text-foreground/55">
-              Tavsiya etilgan oqim (golden path)
-            </p>
-            <GoldenPathVisual />
-          </div>
-
-          <div className="mt-16">
-            <h2 className="mb-6 text-center text-sm font-bold uppercase tracking-[0.15em] text-foreground/60">
-              Kim sifatida kirmoqchisiz?
-            </h2>
-            <RoleEntryCards />
-          </div>
+      <div className="mx-auto max-w-5xl px-4 pb-16 pt-10 md:pt-14">
+        <div className="mx-auto max-w-2xl text-center">
+          <h1 className="text-3xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50 md:text-4xl">
+            Second Teacher
+          </h1>
+          <p className="mt-3 text-lg text-neutral-600 dark:text-neutral-400">
+            A teaching and learning platform with subject structure, textbook-grounded
+            search (RAG), assessments, insights, and AI coaching.
+          </p>
+          <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-500">
+            Demo workflow and API sequence are aligned with the{" "}
+            <Link
+              href="/guide"
+              className="font-medium text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
+            >
+              platform workflow
+            </Link>{" "}
+            guide.
+          </p>
         </div>
-      </section>
+
+        <div className="mt-10">
+          <p className="mb-3 text-center text-xs font-semibold uppercase tracking-wide text-neutral-500">
+            Recommended flow (golden path)
+          </p>
+          <GoldenPathVisual />
+        </div>
+
+        <div id="role-selection" className="mt-12 scroll-mt-24">
+          <h2 className="mb-4 text-center text-sm font-semibold text-neutral-800 dark:text-neutral-200">
+            Which role do you want to use?
+          </h2>
+          <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-left text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-100">
+            <p className="font-semibold">Demo accounts</p>
+            <p className="mt-1">
+              You can test how the platform looks and works using our demo accounts,
+              already filled with data.
+            </p>
+            <ul className="mt-3 space-y-1 font-mono text-xs sm:text-sm">
+              <li>Student: lila.kim_demo@secondteacher.dev / DemoSeed2026!</li>
+              <li>Teacher: kamila.saidova_demo@secondteacher.dev / DemoSeed2026!</li>
+            </ul>
+          </div>
+          <RoleEntryCards />
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { DevPersistenceBanner } from "@/components/layout/DevPersistenceBanner";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,10 +25,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        suppressHydrationWarning
-        className={`${geistSans.variable} ${geistMono.variable} min-h-screen font-[family-name:var(--font-geist-sans)] antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased`}
       >
-        <DevPersistenceBanner />
         {children}
       </body>
     </html>

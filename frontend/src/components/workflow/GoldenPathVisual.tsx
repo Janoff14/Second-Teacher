@@ -1,40 +1,40 @@
 import Link from "next/link";
 
 const STEPS = [
-  { label: "Tuzilma", hint: "fan, guruh, kod", wf: "WF-ACADEMIC" },
-  { label: "Darslik + RAG", hint: "yuklash va qidiruv", wf: "WF-CORPUS-*" },
-  { label: "Qo\u2018shilish", hint: "talaba", wf: "WF-JOIN" },
-  { label: "Baholash", hint: "testlar", wf: "WF-ASSESS-*" },
-  { label: "Insights", hint: "xavf / feed", wf: "WF-INSIGHTS-*" },
+  { label: "Structure", hint: "subject, group, code", wf: "WF-ACADEMIC" },
+  { label: "Textbook + RAG", hint: "ingest and search", wf: "WF-CORPUS-*" },
+  { label: "Join", hint: "student", wf: "WF-JOIN" },
+  { label: "Assessments", hint: "tests", wf: "WF-ASSESS-*" },
+  { label: "Insights", hint: "risk / feed", wf: "WF-INSIGHTS-*" },
   { label: "Agent", hint: "chat", wf: "WF-AGENT-*" },
 ] as const;
 
 export function GoldenPathVisual() {
   return (
     <div className="w-full overflow-x-auto pb-2">
-      <ol className="flex min-w-[min(100%,720px)] items-stretch gap-3 md:gap-4">
+      <ol className="flex min-w-[min(100%,720px)] items-stretch gap-2 md:gap-3">
         {STEPS.map((s, i) => (
           <li
             key={s.label}
-            className="group relative flex flex-1 flex-col rounded-2xl border border-brand-200/50 bg-white px-3 py-4 text-center shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-card-hover dark:border-slate-700 dark:bg-slate-900 dark:hover:border-brand-700"
+            className="flex flex-1 flex-col rounded-lg border border-blue-200/80 bg-gradient-to-b from-blue-50/90 to-white px-2 py-3 text-center dark:border-blue-900/50 dark:from-blue-950/40 dark:to-neutral-950"
           >
-            <span className="mx-auto flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-violet-500 text-[11px] font-bold text-white shadow-sm">
+            <span className="text-[10px] font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">
               {i + 1}
             </span>
-            <span className="mt-2 text-xs font-bold text-foreground md:text-sm">
+            <span className="mt-1 text-xs font-semibold text-neutral-900 dark:text-neutral-100 md:text-sm">
               {s.label}
             </span>
-            <span className="mt-1 hidden text-[10px] text-foreground/55 sm:block">
+            <span className="mt-0.5 hidden text-[10px] text-neutral-500 sm:block">
               {s.hint}
             </span>
-            <span className="mt-1.5 font-mono text-[9px] text-foreground/50">{s.wf}</span>
+            <span className="mt-1 font-mono text-[9px] text-neutral-400">{s.wf}</span>
           </li>
         ))}
       </ol>
-      <p className="mt-4 text-center text-xs text-foreground/55">
-        Batafsil:{" "}
-        <Link href="/guide" className="font-semibold text-brand-500 underline-offset-2 hover:underline dark:text-brand-400">
-          Platform yo{"'"}riqnomasi
+      <p className="mt-3 text-center text-xs text-neutral-500 dark:text-neutral-400">
+        Details:{" "}
+        <Link href="/guide" className="text-blue-600 underline dark:text-blue-400">
+          Platform guide
         </Link>{" "}
         (repo: <span className="font-mono text-[10px]">platform-user-workflow.md</span>).
       </p>

@@ -14,7 +14,7 @@ function ErrorBox({ message }: { message: string | null }) {
   return (
     <div
       role="alert"
-      className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-200"
+      className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-100"
     >
       {message}
     </div>
@@ -24,18 +24,17 @@ function ErrorBox({ message }: { message: string | null }) {
 type RoleHint = "teacher" | "student" | "admin" | null;
 
 function roleHeading(hint: RoleHint): string {
-  if (hint === "teacher") return "O\u2018qituvchi sifatida kirish";
-  if (hint === "student") return "Talaba sifatida kirish";
-  if (hint === "admin") return "Administrator sifatida kirish";
-  return "Kirish";
+  if (hint === "teacher") return "Sign in as Teacher";
+  if (hint === "student") return "Sign in as Student";
+  if (hint === "admin") return "Sign in as Administrator";
+  return "Sign in";
 }
 
 function roleDescription(hint: RoleHint): string {
-  if (hint === "teacher")
-    return "Admin tomonidan berilgan email va parol bilan kiring.";
-  if (hint === "student") return "Talaba demo akkaunti bilan kiring.";
-  if (hint === "admin") return "Administrator email va parol bilan kiring.";
-  return "Email va parol bilan kiring.";
+  if (hint === "teacher") return "Use your teacher email and password.";
+  if (hint === "student") return "Use your student demo account to explore the platform.";
+  if (hint === "admin") return "Use your administrator email and password.";
+  return "Use your email and password.";
 }
 
 function demoAccountsForRole(hint: RoleHint): Array<{ role: string; email: string; password: string }> {
@@ -69,12 +68,6 @@ function demoAccountsForRole(hint: RoleHint): Array<{ role: string; email: strin
   return [];
 }
 
-function roleGradient(hint: RoleHint): string {
-  if (hint === "teacher") return "from-brand-500 to-violet-500";
-  if (hint === "admin") return "from-amber-500 to-orange-500";
-  return "from-brand-500 to-brand-600";
-}
-
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -106,7 +99,7 @@ function LoginContent() {
     const session = sessionFromAuthResponse(res.data);
     if (!session) {
       setError(
-        "Kutilmagan javob \u2014 session.ts ni API ga moslashtiring.",
+        "Unexpected login response. Please align session parsing with the API shape.",
       );
       return;
     }
@@ -122,105 +115,90 @@ function LoginContent() {
     redirectAfterAuth(session.role);
   }
 
-  const gradient = roleGradient(roleHint);
-
   return (
-    <div className="relative flex min-h-screen items-center justify-center px-5 py-16">
-      <div className="absolute inset-0 bg-dot-pattern opacity-30" />
-      <div className="absolute -left-32 top-1/4 h-64 w-64 rounded-full bg-brand-400/20 blur-[100px]" />
-      <div className="absolute -right-32 top-1/3 h-80 w-80 rounded-full bg-violet-400/15 blur-[120px]" />
+    <div className="mx-auto max-w-md px-6 py-16">
+      <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
+        {roleHeading(roleHint)}
+      </h1>
+      <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
+        {roleDescription(roleHint)}
+      </p>
 
-      <div className="relative w-full max-w-md animate-fade-in">
-        <div className={`h-1.5 rounded-t-3xl bg-gradient-to-r ${gradient}`} />
-        <div className="rounded-b-3xl border border-foreground/10 bg-white/80 px-8 py-10 shadow-card backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
-          <Link href="/" className="text-lg font-bold tracking-tight text-foreground">
-            Second<span className="text-gradient-brand">Teacher</span>
-          </Link>
+      {sessionExpired && (
+        <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100">
+          Session expired (401). Please sign in again.
+        </p>
+      )}
 
-          <h1 className="mt-6 text-2xl font-bold text-foreground">
-            {roleHeading(roleHint)}
-          </h1>
-          <p className="mt-2 text-sm leading-relaxed text-foreground/70">
-            {roleDescription(roleHint)}
-          </p>
-
-          {sessionExpired && (
-            <p className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
-              Sessiya tugadi (401). Qayta kiring.
-            </p>
-          )}
-
-          {demoAccounts.length > 0 ? (
-            <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs leading-relaxed text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
-              <span className="font-semibold">Demo account</span>: test uchun tayyor ma&apos;lumotli
-              akkaunt.
-              <ul className="mt-2 space-y-1 font-mono">
-                {demoAccounts.map((account) => (
-                  <li key={account.email}>
-                    {account.role}: {account.email} / {account.password}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          <ErrorBox message={error} />
-
-          <form onSubmit={handleLogin} className="mt-7 space-y-5">
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-semibold text-foreground/80"
-              >
-                Elektron pochta
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                placeholder="example@mail.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-foreground/15 bg-background px-4 py-2.5 text-sm text-foreground transition-colors placeholder:text-foreground/40"
-                disabled={loading}
-                required
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-semibold text-foreground/80"
-              >
-                Parol
-              </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-foreground/15 bg-background px-4 py-2.5 text-sm text-foreground transition-colors placeholder:text-foreground/40"
-                disabled={loading}
-                required
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className={`w-full rounded-xl bg-gradient-to-r ${gradient} py-3 text-sm font-semibold text-white shadow-glow transition-all hover:shadow-glow-lg hover:brightness-110 disabled:opacity-50`}
-            >
-              {loading ? "Kirilmoqda\u2026" : "Kirish"}
-            </button>
-          </form>
-
-          <p className="mt-8 text-sm">
-            <Link href="/" className="font-semibold text-brand-500 hover:underline dark:text-brand-400">
-              &larr; Bosh sahifa
-            </Link>
-          </p>
+      {demoAccounts.length > 0 ? (
+        <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-100">
+          <span className="font-semibold">Demo account</span>: use this pre-filled account to test the
+          platform with existing data.
+          <ul className="mt-2 space-y-1 font-mono">
+            {demoAccounts.map((account) => (
+              <li key={account.email}>
+                {account.role}: {account.email} / {account.password}
+              </li>
+            ))}
+          </ul>
         </div>
-      </div>
+      ) : null}
+
+      <ErrorBox message={error} />
+
+      <form onSubmit={handleLogin} className="mt-6 space-y-4">
+        <div>
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
+          >
+            Email
+          </label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              placeholder="example@mail.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+              disabled={loading}
+              required
+            />
+        </div>
+        <div>
+          <label
+            htmlFor="password"
+            className="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
+          >
+            Password
+          </label>
+            <input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              placeholder="password"
+              value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
+            disabled={loading}
+            required
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded-md bg-neutral-900 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
+        >
+          {loading ? "Signing in..." : "Sign in"}
+        </button>
+      </form>
+
+      <p className="mt-8 text-sm">
+        <Link href="/" className="text-blue-600 hover:underline dark:text-blue-400">
+          &larr; Home
+        </Link>
+      </p>
     </div>
   );
 }
@@ -228,11 +206,7 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center">
-          <p className="text-sm text-foreground/55">Yuklanmoqda&hellip;</p>
-        </div>
-      }
+      fallback={<div className="p-8 text-sm text-neutral-500">Loading&hellip;</div>}
     >
       <LoginContent />
     </Suspense>

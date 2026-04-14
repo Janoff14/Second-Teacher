@@ -5,11 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { TeacherCommandPalette } from "@/components/teacher/TeacherCommandPalette";
 import { getTeacherAiBriefing } from "@/lib/api/assessments";
-import {
-  listMyNotifications,
-  unwrapNotificationList,
-} from "@/lib/api/notifications";
-import { getUnreadCount } from "@/lib/api/messages";
 import { useAuthStore } from "@/stores/auth-store";
 import type { UserRole } from "@/stores/auth-store";
 
@@ -23,15 +18,13 @@ const adminTabs: NavItem[] = [
 ];
 
 const teacherTabs: NavItem[] = [
-  { href: "/teacher", label: "Bosh panel" },
-  { href: "/messages", label: "Messages" },
-  { href: "/notifications", label: "Bildirishnomalar" },
+  { href: "/teacher", label: "Dashboard" },
+  { href: "/notifications", label: "Notifications" },
 ];
 
 const studentTabs: NavItem[] = [
   { href: "/student", label: "My subjects" },
   { href: "/join", label: "Join class" },
-  { href: "/messages", label: "Messages" },
   { href: "/notifications", label: "AI alerts" },
 ];
 
@@ -52,12 +45,6 @@ function isActive(pathname: string, href: string): boolean {
   return pathname.startsWith(href);
 }
 
-const sectionGradient: Record<Section, string> = {
-  teacher: "from-brand-600 via-brand-500 to-violet-500",
-  student: "from-accent-600 via-accent-500 to-cyan-500",
-  admin: "from-amber-600 via-orange-500 to-rose-500",
-};
-
 export function AppShell({
   section,
   children,
@@ -72,8 +59,6 @@ export function AppShell({
   const clearSession = useAuthStore((s) => s.clearSession);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [attentionCount, setAttentionCount] = useState<number | null>(null);
-  const [notifCount, setNotifCount] = useState(0);
-  const [msgCount, setMsgCount] = useState(0);
 
   const teacherGroupFromPath =
     section === "teacher" && pathname.startsWith("/teacher/groups/")
@@ -82,18 +67,6 @@ export function AppShell({
   const decodedTeacherGroupId = teacherGroupFromPath
     ? decodeURIComponent(teacherGroupFromPath)
     : null;
-
-  const palettePageContext = (() => {
-    if (!pathname.startsWith("/teacher/groups/")) return undefined;
-    const studentMatch = pathname.match(/\/teacher\/groups\/[^/]+\/students\/([^/]+)/);
-    if (studentMatch) {
-      return {
-        page: "teacher-student-profile" as const,
-        studentId: decodeURIComponent(studentMatch[1]!),
-      };
-    }
-    return { page: "teacher-group" as const };
-  })();
 
   const refreshAttention = useCallback(async () => {
     if (!decodedTeacherGroupId) {
@@ -109,33 +82,6 @@ export function AppShell({
   useEffect(() => {
     void refreshAttention();
   }, [refreshAttention]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function poll() {
-      const [nRes, mRes] = await Promise.allSettled([
-        listMyNotifications(50),
-        getUnreadCount(),
-      ]);
-      if (cancelled) return;
-      if (nRes.status === "fulfilled" && nRes.value.ok) {
-        const items = unwrapNotificationList(nRes.value.data);
-        setNotifCount(items.filter((n) => n.read === false).length);
-      }
-      if (mRes.status === "fulfilled" && mRes.value.ok && mRes.value.data) {
-        const raw = mRes.value.data as Record<string, unknown>;
-        setMsgCount(typeof raw.count === "number" ? raw.count : 0);
-      }
-    }
-    void poll();
-    const timer = setInterval(() => void poll(), 30_000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, []);
-
-  const totalBadge = notifCount + msgCount;
 
   useEffect(() => {
     if (section !== "teacher") return;
@@ -158,7 +104,7 @@ export function AppShell({
 
   function handleLogout() {
     clearSession();
-    router.push("/");
+    router.push("/login");
   }
 
   function closePalette() {
@@ -167,93 +113,63 @@ export function AppShell({
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col">
       {section === "teacher" ? (
         <TeacherCommandPalette
           groupId={decodedTeacherGroupId}
           open={paletteOpen}
           onClose={closePalette}
-          pageContext={palettePageContext}
         />
       ) : null}
-
-      <header className="sticky top-0 z-40 border-b border-foreground/8 bg-glass">
-        <div className={`h-1 bg-gradient-to-r ${sectionGradient[section]}`} />
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-5 py-3">
-          <div className="flex flex-wrap items-center gap-5">
+      <header className="border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-4">
             <Link
               href={section === "admin" ? "/admin" : section === "student" ? "/student" : "/teacher"}
-              className="text-lg font-bold tracking-tight text-foreground"
+              className="font-semibold text-neutral-900 dark:text-neutral-100"
             >
-              Second<span className="text-gradient-brand">Teacher</span>
+              Second Teacher
             </Link>
             <nav className="flex flex-wrap gap-1 text-sm">
-              {tabs.map((tab) => {
-                const badge =
-                  tab.href === "/messages" && msgCount > 0
-                    ? msgCount
-                    : tab.href === "/notifications" && notifCount > 0
-                      ? notifCount
-                      : 0;
-                return (
-                  <Link
-                    key={tab.href}
-                    href={tab.href}
-                    className={
-                      isActive(pathname, tab.href)
-                        ? "rounded-full bg-brand-100 px-3.5 py-1.5 font-semibold text-brand-700 dark:bg-brand-950 dark:text-brand-300"
-                        : "rounded-full px-3.5 py-1.5 text-foreground/70 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-950/50 dark:hover:text-brand-400"
-                    }
-                  >
-                    {tab.label}
-                    {badge > 0 && (
-                      <span className="ml-1.5 inline-flex h-4.5 min-w-[1.125rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
-                        {badge > 9 ? "9+" : badge}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
+              {tabs.map((tab) => (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  className={
+                    isActive(pathname, tab.href)
+                      ? "rounded-md bg-neutral-100 px-2.5 py-1 font-medium text-neutral-900 dark:bg-neutral-800 dark:text-neutral-50"
+                      : "rounded-md px-2.5 py-1 text-neutral-600 hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-900"
+                  }
+                >
+                  {tab.label}
+                </Link>
+              ))}
             </nav>
           </div>
-          <div className="flex items-center gap-3 text-sm">
+          <div className="flex items-center gap-3 text-sm text-neutral-600 dark:text-neutral-400">
             {section === "teacher" ? (
               <button
                 type="button"
                 title="Open class assistant (Ctrl+K or Cmd+K)"
                 onClick={() => setPaletteOpen(true)}
-                className="relative rounded-full bg-gradient-to-r from-brand-500 to-violet-500 px-4 py-1.5 text-xs font-semibold text-white shadow-glow transition-shadow hover:shadow-glow-lg"
+                className="relative rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-800 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-900"
               >
                 Assistant
                 {attentionCount != null && attentionCount > 0 ? (
-                  <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white dark:ring-brand-950">
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-violet-600 px-1 text-[10px] font-semibold text-white">
                     {attentionCount > 9 ? "9+" : attentionCount}
                   </span>
                 ) : null}
               </button>
             ) : null}
-            <Link
-              href="/notifications"
-              className="relative rounded-full p-2 text-foreground/60 transition-colors hover:bg-brand-50 hover:text-brand-600 dark:hover:bg-brand-950/50 dark:hover:text-brand-400"
-              title="Notifications"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-              </svg>
-              {totalBadge > 0 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-[1.125rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white ring-2 ring-white dark:ring-neutral-900">
-                  {totalBadge > 9 ? "9+" : totalBadge}
-                </span>
-              )}
-            </Link>
             {role && (
-              <span className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold capitalize text-brand-600 dark:bg-brand-950 dark:text-brand-300">
+              <span className="rounded bg-neutral-100 px-2 py-0.5 capitalize dark:bg-neutral-800">
                 {role}
               </span>
             )}
             {role === "student" && activeGroupId && (
               <span
-                className="max-w-[10rem] truncate font-mono text-xs text-foreground/55"
+                className="max-w-[10rem] truncate font-mono text-xs text-neutral-500"
                 title={activeGroupId}
               >
                 group {activeGroupId.slice(0, 8)}&hellip;
@@ -262,14 +178,14 @@ export function AppShell({
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-full border border-foreground/15 px-4 py-1.5 text-sm font-medium text-foreground/70 transition-all hover:border-brand-300 hover:text-brand-600 dark:hover:border-brand-700 dark:hover:text-brand-400"
+              className="rounded-md border border-neutral-300 px-3 py-1.5 text-neutral-800 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-900"
             >
-              Chiqish
+              Sign out
             </button>
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-5 py-8">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
         {children}
       </main>
     </div>

@@ -10,11 +10,11 @@ export type Group = {
   id: string;
   subjectId: string;
   name: string;
-  /** Agar API yuborsa — faqat shu o‘qituvchi idlari guruhni ko‘radi. */
+  /** If provided by API, only these teacher IDs can access the group. */
   assignedTeacherIds?: string[];
 };
 
-/** GET /teacher/academic-scope — bitta so‘rovda biriktirilgan fanlar va guruhlar. */
+/** GET /teacher/academic-scope — assigned subjects and groups in one call. */
 export type TeacherSubjectBlock = {
   subject: Subject;
   groups: Group[];
@@ -40,7 +40,7 @@ export function unwrapTeacherAcademicScope(raw: unknown): TeacherSubjectBlock[] 
   return [];
 }
 
-/** Backend aniq bo‘sh ro‘yxat qaytarganda — fallback qilmaymiz. */
+/** Do not fallback when backend returns an explicit empty list. */
 export function isExplicitEmptyTeacherScope(raw: unknown): boolean {
   if (!raw || typeof raw !== "object") return false;
   const o = raw as Record<string, unknown>;
@@ -57,8 +57,9 @@ export function isExplicitEmptyTeacherScope(raw: unknown): boolean {
 }
 
 /**
- * Guruhni to‘g‘ri fan ostida qoldiradi; `assignedTeacherIds` bo‘lsa — joriy o‘qituvchiga qarab qisqartiradi.
- * Maydon yo‘q bo‘lsa, backend allaqachon filtrlagan deb hisoblanadi (oldingi xatti-harakat).
+ * Keeps groups under the right subject; if `assignedTeacherIds` is present,
+ * narrows visibility to the current teacher.
+ * If the field is missing, backend is assumed to have already filtered.
  */
 export function filterGroupsForTeacher(
   groups: Group[],
