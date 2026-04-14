@@ -21,11 +21,15 @@ export default function AiGenerateTestPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [textbooks, setTextbooks] = useState<TextbookSource[]>([]);
   const [availableTopics, setAvailableTopics] = useState<string[]>([]);
+  const [availableChapters, setAvailableChapters] = useState<
+    Array<{ chapterNumber: number; title: string; startPage: number; endPage: number }>
+  >([]);
 
   const [subjectId, setSubjectId] = useState("");
   const [groupId, setGroupId] = useState("");
   const [textbookSourceId, setTextbookSourceId] = useState("");
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+  const [selectedChapterNumbers, setSelectedChapterNumbers] = useState<number[]>([]);
   const [customTopic, setCustomTopic] = useState("");
   const [questionCount, setQuestionCount] = useState(5);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
@@ -78,11 +82,13 @@ export default function AiGenerateTestPage() {
     const res = await getTextbookTopics(textbookSourceId, subjectId);
     if (res.ok && res.data?.topics) {
       setAvailableTopics(res.data.topics);
+      setAvailableChapters(Array.isArray(res.data.chapters) ? res.data.chapters : []);
     }
   }, [textbookSourceId, subjectId]);
 
   useEffect(() => {
     setSelectedTopics([]);
+    setSelectedChapterNumbers([]);
     void loadTopics();
   }, [loadTopics]);
 
@@ -101,10 +107,22 @@ export default function AiGenerateTestPage() {
     setCustomTopic("");
   }
 
+  function toggleChapter(chapterNumber: number) {
+    setSelectedChapterNumbers((prev) =>
+      prev.includes(chapterNumber)
+        ? prev.filter((n) => n !== chapterNumber)
+        : [...prev, chapterNumber],
+    );
+  }
+
   async function handleGenerate(e: React.FormEvent) {
     e.preventDefault();
-    if (!groupId || !textbookSourceId || selectedTopics.length === 0) {
-      setError("Please select a subject, class, textbook, and at least one topic.");
+    if (
+      !groupId ||
+      !textbookSourceId ||
+      (selectedTopics.length === 0 && selectedChapterNumbers.length === 0)
+    ) {
+      setError("Please select a subject, class, textbook, and at least one chapter or topic.");
       return;
     }
 
@@ -115,7 +133,8 @@ export default function AiGenerateTestPage() {
     const res = await aiGenerateTest({
       groupId,
       textbookSourceId,
-      topics: selectedTopics,
+      ...(selectedTopics.length > 0 ? { topics: selectedTopics } : {}),
+      ...(selectedChapterNumbers.length > 0 ? { chapterNumbers: selectedChapterNumbers } : {}),
       questionCount,
       difficulty,
       title: title.trim() || undefined,
@@ -309,17 +328,46 @@ export default function AiGenerateTestPage() {
             )}
           </div>
 
-          {/* Topic selection */}
+          {/* Chapter and topic selection */}
           <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
             <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
-              3. Select topics
+              3. Select chapters and topics
             </h2>
             <p className="mt-1 text-sm text-neutral-500">
-              Pick from textbook chapters or add your own topic.
+              Pick one or more chapters for concentrated generation. Topics are optional boosters.
             </p>
 
+            {availableChapters.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                  Chapters:
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {availableChapters.map((chapter) => (
+                    <button
+                      key={chapter.chapterNumber}
+                      type="button"
+                      onClick={() => toggleChapter(chapter.chapterNumber)}
+                      className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                        selectedChapterNumbers.includes(chapter.chapterNumber)
+                          ? "border-violet-400 bg-violet-100 font-medium text-violet-800 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-200"
+                          : "border-neutral-200 bg-neutral-50 text-neutral-700 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+                      }`}
+                    >
+                      {selectedChapterNumbers.includes(chapter.chapterNumber) ? "✓ " : ""}
+                      Ch {chapter.chapterNumber}: {chapter.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {availableTopics.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-4">
+                <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
+                  Topic boosters:
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
                 {availableTopics.map((topic) => (
                   <button
                     key={topic}
@@ -335,6 +383,7 @@ export default function AiGenerateTestPage() {
                     {topic}
                   </button>
                 ))}
+                </div>
               </div>
             )}
 
@@ -383,6 +432,11 @@ export default function AiGenerateTestPage() {
                   ))}
                 </div>
               </div>
+            )}
+            {selectedChapterNumbers.length > 0 && (
+              <p className="mt-3 text-xs text-neutral-500 dark:text-neutral-400">
+                Chapters selected: {[...selectedChapterNumbers].sort((a, b) => a - b).join(", ")}
+              </p>
             )}
           </div>
 
@@ -437,7 +491,12 @@ export default function AiGenerateTestPage() {
           <div className="flex flex-wrap items-center gap-4">
             <button
               type="submit"
-              disabled={generating || !groupId || !textbookSourceId || selectedTopics.length === 0}
+              disabled={
+                generating ||
+                !groupId ||
+                !textbookSourceId ||
+                (selectedTopics.length === 0 && selectedChapterNumbers.length === 0)
+              }
               className="rounded-xl bg-violet-700 px-6 py-3 text-sm font-medium text-white transition hover:bg-violet-600 disabled:opacity-50 dark:bg-violet-600 dark:hover:bg-violet-500"
             >
               {generating ? (

@@ -20,7 +20,8 @@ export interface GenerateTestParams {
   subjectId: string;
   groupId: string;
   textbookSourceId: string;
-  topics: string[];
+  topics?: string[];
+  chapterNumbers?: number[];
   questionCount: number;
   difficulty?: "easy" | "medium" | "hard" | undefined;
 }
@@ -37,6 +38,22 @@ export function listTextbookTopics(textbookSourceId: string): string[] {
   return doc.chapters.map((ch) => ch.title);
 }
 
+export function listTextbookChapters(textbookSourceId: string): Array<{
+  chapterNumber: number;
+  title: string;
+  startPage: number;
+  endPage: number;
+}> {
+  const doc = getTextbookReaderDocument(textbookSourceId);
+  if (!doc) return [];
+  return doc.chapters.map((chapter) => ({
+    chapterNumber: chapter.chapterNumber,
+    title: chapter.title,
+    startPage: chapter.startPage,
+    endPage: chapter.endPage,
+  }));
+}
+
 export function getTextbookSource(
   textbookSourceId: string,
   subjectId: string,
@@ -49,8 +66,11 @@ async function retrieveTopicChunks(params: {
   topics: string[];
   subjectId: string;
   groupId: string;
+  textbookSourceId: string;
+  chapterNumbers: number[];
   topKPerTopic: number;
 }): Promise<RetrievalHit[]> {
+  const chapterSet = new Set(params.chapterNumbers);
   const allHits: RetrievalHit[] = [];
   const seenChunkIds = new Set<string>();
 
@@ -62,7 +82,12 @@ async function retrieveTopicChunks(params: {
       topK: params.topKPerTopic,
     });
     for (const hit of hits) {
-      if (!seenChunkIds.has(hit.chunkId) && hit.citation.sourceType === "textbook") {
+      if (seenChunkIds.has(hit.chunkId)) continue;
+      if (hit.citation.sourceType !== "textbook") continue;
+      if (hit.citation.textbookSourceId !== params.textbookSourceId) continue;
+      const chapterNumber = hit.citation.textbookLocation?.chapterNumber;
+      if (chapterSet.size > 0 && (!chapterNumber || !chapterSet.has(chapterNumber))) continue;
+      if (!seenChunkIds.has(hit.chunkId)) {
         seenChunkIds.add(hit.chunkId);
         allHits.push(hit);
       }
@@ -193,13 +218,33 @@ function generateFallbackItems(
 export async function generateTestFromTextbook(
   params: GenerateTestParams,
 ): Promise<GenerateTestResult> {
-  const { subjectId, groupId, topics, questionCount, difficulty = "medium" } = params;
+  const { subjectId, groupId, textbookSourceId, questionCount, difficulty = "medium" } = params;
+  const topics = (params.topics ?? []).map((topic) => topic.trim()).filter(Boolean);
+  const chapterNumbers = [...new Set((params.chapterNumbers ?? []).filter((value) => Number.isInteger(value) && value > 0))];
+
+  const readerDoc = getTextbookReaderDocument(textbookSourceId);
+  const selectedChapters =
+    chapterNumbers.length > 0
+      ? chapterNumbers
+      : (readerDoc?.chapters.slice(0, 3).map((chapter) => chapter.chapterNumber) ?? []);
+  const chapterTitleQueries =
+    readerDoc?.chapters
+      .filter((chapter) => selectedChapters.includes(chapter.chapterNumber))
+      .map((chapter) => chapter.title)
+      .filter(Boolean) ?? [];
+  const retrievalQueries = [...topics, ...chapterTitleQueries];
+
+  if (retrievalQueries.length === 0) {
+    return { items: [], topicsUsed: [], chunksRetrieved: 0 };
+  }
 
   const chunks = await retrieveTopicChunks({
-    topics,
+    topics: retrievalQueries,
     subjectId,
     groupId,
-    topKPerTopic: Math.max(4, Math.ceil(questionCount / topics.length) + 2),
+    textbookSourceId,
+    chapterNumbers: selectedChapters,
+    topKPerTopic: Math.max(6, Math.ceil(questionCount / Math.max(retrievalQueries.length, 1)) + 6),
   });
 
   if (chunks.length === 0) {
@@ -209,7 +254,7 @@ export async function generateTestFromTextbook(
   if (!hasOpenAI()) {
     logger.info("ai_test_gen_no_openai_using_fallback");
     const items = generateFallbackItems(chunks, questionCount);
-    return { items, topicsUsed: topics, chunksRetrieved: chunks.length };
+    return { items, topicsUsed: retrievalQueries, chunksRetrieved: chunks.length };
   }
 
   const prompt = buildPrompt({ topics, questionCount, difficulty, chunks });
@@ -219,25 +264,25 @@ export async function generateTestFromTextbook(
     if (!raw) {
       logger.warn("ai_test_gen_empty_response");
       const items = generateFallbackItems(chunks, questionCount);
-      return { items, topicsUsed: topics, chunksRetrieved: chunks.length };
+      return { items, topicsUsed: retrievalQueries, chunksRetrieved: chunks.length };
     }
 
     const items = parseGeneratedItems(raw, chunks);
     if (items.length === 0) {
       logger.warn("ai_test_gen_no_valid_items_parsed");
       const fallback = generateFallbackItems(chunks, questionCount);
-      return { items: fallback, topicsUsed: topics, chunksRetrieved: chunks.length };
+      return { items: fallback, topicsUsed: retrievalQueries, chunksRetrieved: chunks.length };
     }
 
     logger.info(
       { requested: questionCount, generated: items.length, chunks: chunks.length },
       "ai_test_gen_success",
     );
-    return { items, topicsUsed: topics, chunksRetrieved: chunks.length };
+    return { items, topicsUsed: retrievalQueries, chunksRetrieved: chunks.length };
   } catch (err) {
     logger.error({ err }, "ai_test_gen_llm_failed");
     const items = generateFallbackItems(chunks, questionCount);
-    return { items, topicsUsed: topics, chunksRetrieved: chunks.length };
+    return { items, topicsUsed: retrievalQueries, chunksRetrieved: chunks.length };
   }
 }
 

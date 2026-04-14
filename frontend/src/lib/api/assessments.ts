@@ -268,7 +268,8 @@ export async function getPublishedAssessment(publishedId: string) {
 export type AiGenerateBody = {
   groupId: string;
   textbookSourceId: string;
-  topics: string[];
+  topics?: string[];
+  chapterNumbers?: number[];
   questionCount?: number;
   difficulty?: "easy" | "medium" | "hard";
   title?: string;
@@ -288,6 +289,12 @@ export type TextbookTopicsResult = {
   textbookSourceId: string;
   textbookTitle: string;
   topics: string[];
+  chapters?: Array<{
+    chapterNumber: number;
+    title: string;
+    startPage: number;
+    endPage: number;
+  }>;
 };
 
 export async function aiGenerateTest(body: AiGenerateBody) {

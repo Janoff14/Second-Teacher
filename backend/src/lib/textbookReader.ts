@@ -81,10 +81,13 @@ function isChapterHeading(line: string): boolean {
   if (!trimmed) {
     return false;
   }
+  const normalized = trimmed.replace(/\s+/g, " ");
   return (
     /^#{1,6}\s+\S/.test(trimmed) ||
-    /^chapter\s+\d+([:\s-].*)?$/i.test(trimmed) ||
-    /^(unit|lesson|part)\s+\d+([:\s-].*)?$/i.test(trimmed)
+    /^chapter\s+(\d+|[ivxlcdm]+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b([:\s-].*)?$/i.test(normalized) ||
+    /^(unit|lesson|part)\s+\d+([:\s-].*)?$/i.test(normalized) ||
+    /^\d{1,2}([.)]|[\s:-])\s*[A-Z][A-Za-z0-9 ,'"()\-]{4,}$/.test(normalized) ||
+    /^[A-Z][A-Z0-9 ,'"()\-]{7,}$/.test(normalized)
   );
 }
 

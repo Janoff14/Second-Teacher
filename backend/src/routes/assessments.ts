@@ -29,6 +29,7 @@ import { appendAuditLog } from "../domain/auditStore";
 import { getUserById } from "../domain/userStore";
 import {
   generateTestFromTextbook,
+  listTextbookChapters,
   listTextbookTopics,
   getTextbookSource,
   generateStudyRecommendations,
@@ -124,7 +125,8 @@ assessmentsRouter.get("/assessments/drafts/:draftId", requireAuth, requireRole([
 const aiGenerateSchema = z.object({
   groupId: z.string().min(1),
   textbookSourceId: z.string().min(1),
-  topics: z.array(z.string().min(1)).min(1),
+  topics: z.array(z.string().min(1)).optional(),
+  chapterNumbers: z.array(z.number().int().min(1)).optional(),
   questionCount: z.number().int().min(1).max(30).optional(),
   difficulty: z.enum(["easy", "medium", "hard"]).optional(),
   title: z.string().min(1).optional(),
@@ -161,11 +163,20 @@ assessmentsRouter.post(
       }
 
       const questionCount = body.questionCount ?? 5;
+      const topics = body.topics ?? [];
+      const chapterNumbers = body.chapterNumbers ?? [];
+      if (topics.length === 0 && chapterNumbers.length === 0) {
+        const err = new Error("Select at least one topic or chapter.") as Error & { statusCode?: number; code?: string };
+        err.statusCode = 400;
+        err.code = "VALIDATION_ERROR";
+        throw err;
+      }
       const result = await generateTestFromTextbook({
         subjectId: group.subjectId,
         groupId: body.groupId,
         textbookSourceId: body.textbookSourceId,
-        topics: body.topics,
+        topics,
+        chapterNumbers,
         questionCount,
         difficulty: body.difficulty,
       });
@@ -177,7 +188,8 @@ assessmentsRouter.post(
         throw err;
       }
 
-      const title = body.title?.trim() || `AI: ${body.topics.slice(0, 3).join(", ")}`;
+      const titleSeed = topics.length > 0 ? topics : chapterNumbers.map((n) => `Chapter ${n}`);
+      const title = body.title?.trim() || `AI: ${titleSeed.slice(0, 3).join(", ")}`;
       const draft = createDraft(body.groupId, title, user.userId);
       const draftItems = result.items.map((item) => ({
         stem: item.stem,
@@ -196,7 +208,8 @@ assessmentsRouter.post(
         detail: `AI generated ${result.items.length} questions from textbook ${textbook.title}`,
         meta: {
           textbookSourceId: body.textbookSourceId,
-          topics: body.topics,
+          topics,
+          chapterNumbers,
           questionCount: result.items.length,
           chunksRetrieved: result.chunksRetrieved,
         },
@@ -249,11 +262,13 @@ assessmentsRouter.get(
         throw err;
       }
       const topics = listTextbookTopics(textbookSourceId);
+      const chapters = listTextbookChapters(textbookSourceId);
       res.status(200).json({
         data: {
           textbookSourceId,
           textbookTitle: textbook.title,
           topics,
+          chapters,
         },
       });
     } catch (e) {
