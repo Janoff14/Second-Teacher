@@ -5,6 +5,7 @@ import type { UserRole } from "@/stores/auth-store";
 export type LoginBody = {
   email: string;
   password: string;
+  expectedRole?: UserRole;
 };
 
 /** Optional seeded registration (adjust fields to match your API). */

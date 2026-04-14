@@ -959,14 +959,22 @@ export default function TeacherGroupWorkspacePage() {
       {tab === "tests" ? (
         <section className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => void handleCreateDraft()}
-              disabled={testMakerLoading}
-              className="rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
-            >
-              {testMakerLoading ? "Creating..." : "+ New assignment"}
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => void handleCreateDraft()}
+                disabled={testMakerLoading}
+                className="rounded-xl bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
+              >
+                {testMakerLoading ? "Creating..." : "+ New assignment"}
+              </button>
+              <Link
+                href={`/teacher/assessments/ai-generate?subjectId=${encodeURIComponent(subject.id)}&groupId=${encodeURIComponent(groupId)}`}
+                className="rounded-xl bg-violet-700 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-violet-600 dark:bg-violet-600 dark:hover:bg-violet-500"
+              >
+                Generate from textbook + topics
+              </Link>
+            </div>
             <button
               type="button"
               onClick={() => void loadTestMaker()}

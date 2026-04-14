@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { listSubjects, listGroups, type Subject, type Group } from "@/lib/api/academic";
 import { listTextbookSources, type TextbookSource } from "@/lib/api/rag";
@@ -13,6 +13,9 @@ import {
 
 export default function AiGenerateTestPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialSubjectId = searchParams.get("subjectId") ?? "";
+  const initialGroupId = searchParams.get("groupId") ?? "";
 
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -35,9 +38,14 @@ export default function AiGenerateTestPage() {
   useEffect(() => {
     void (async () => {
       const res = await listSubjects();
-      if (res.ok && Array.isArray(res.data)) setSubjects(res.data);
+      if (res.ok && Array.isArray(res.data)) {
+        setSubjects(res.data);
+        if (initialSubjectId && res.data.some((subject) => subject.id === initialSubjectId)) {
+          setSubjectId(initialSubjectId);
+        }
+      }
     })();
-  }, []);
+  }, [initialSubjectId]);
 
   useEffect(() => {
     if (!subjectId) {
@@ -54,6 +62,13 @@ export default function AiGenerateTestPage() {
       if (t.ok && Array.isArray(t.data)) setTextbooks(t.data);
     })();
   }, [subjectId]);
+
+  useEffect(() => {
+    if (!initialGroupId || groups.length === 0) return;
+    if (groups.some((group) => group.id === initialGroupId)) {
+      setGroupId(initialGroupId);
+    }
+  }, [groups, initialGroupId]);
 
   const loadTopics = useCallback(async () => {
     if (!textbookSourceId || !subjectId) {

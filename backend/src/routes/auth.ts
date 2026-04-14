@@ -48,11 +48,16 @@ authRouter.post("/auth/register", validateBody(registerSchema), async (req, res,
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
+  expectedRole: z.enum(["admin", "teacher", "student"]).optional(),
 });
 
 authRouter.post("/auth/login", validateBody(loginSchema), async (req, res, next) => {
   try {
-    const { email, password } = req.body as { email: string; password: string };
+    const { email, password, expectedRole } = req.body as {
+      email: string;
+      password: string;
+      expectedRole?: "admin" | "teacher" | "student";
+    };
     const user = await getUserByEmail(email);
     if (!user) {
       throw new HttpError(401, "INVALID_CREDENTIALS", "Invalid email or password");
@@ -61,6 +66,13 @@ authRouter.post("/auth/login", validateBody(loginSchema), async (req, res, next)
     const isValid = await verifyPassword(user, password);
     if (!isValid) {
       throw new HttpError(401, "INVALID_CREDENTIALS", "Invalid email or password");
+    }
+    if (expectedRole && user.role !== expectedRole) {
+      throw new HttpError(
+        403,
+        "ROLE_MISMATCH",
+        `This account is not a ${expectedRole} account. Please switch role and try again.`,
+      );
     }
 
     const token = signToken(user.id, user.role);

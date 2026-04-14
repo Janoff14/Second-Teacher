@@ -80,6 +80,11 @@ function LoginContent() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const roleSwitcher = [
+    { role: "teacher", label: "Teacher" },
+    { role: "student", label: "Student" },
+    { role: "admin", label: "Admin" },
+  ] as const;
 
   function redirectAfterAuth(role: UserRole) {
     const from = safeInternalPath(searchParams.get("from"));
@@ -90,7 +95,11 @@ function LoginContent() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const res = await login({ email: email.trim(), password });
+    const res = await login({
+      email: email.trim(),
+      password,
+      ...(roleHint ? { expectedRole: roleHint } : {}),
+    });
     setLoading(false);
     if (!res.ok) {
       setError(res.error.message);
@@ -123,6 +132,24 @@ function LoginContent() {
       <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
         {roleDescription(roleHint)}
       </p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {roleSwitcher.map((entry) => {
+          const active = roleHint === entry.role;
+          return (
+            <Link
+              key={entry.role}
+              href={`/login?role=${entry.role}`}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                active
+                  ? "border-blue-500 bg-blue-100 text-blue-900 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-100"
+                  : "border-neutral-300 text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-900"
+              }`}
+            >
+              {entry.label}
+            </Link>
+          );
+        })}
+      </div>
 
       {sessionExpired && (
         <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100">
