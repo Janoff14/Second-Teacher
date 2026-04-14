@@ -1,6 +1,6 @@
 /**
- * Guruh sahifalari ota `teacher/layout.tsx` orqali AuthGuard va AppShell ni oladi.
- * Bu fayl faqat segmentni aniq belgilash uchun.
+ * Group pages inherit AuthGuard and AppShell from `teacher/layout.tsx`.
+ * This file exists only to mark the segment explicitly.
  */
 export default function TeacherGroupSegmentLayout({
   children,

@@ -36,7 +36,7 @@ export default function TeacherInsightsPage() {
   const loadInsights = useCallback(async () => {
     const gid = groupId.trim();
     if (!gid) {
-      setError("Guruh ID kiriting.");
+      setError("Enter a group ID.");
       return;
     }
     setLoading(true);
@@ -64,7 +64,7 @@ export default function TeacherInsightsPage() {
   async function handleRecompute() {
     const gid = groupId.trim();
     if (!gid) {
-      setError("Avval yuqorida guruh ID kiriting.");
+      setError("Enter a group ID above first.");
       return;
     }
     setRecomputeBusy(true);
@@ -82,7 +82,7 @@ export default function TeacherInsightsPage() {
     const sid = studentId.trim();
     const gid = riskGroupId.trim() || groupId.trim();
     if (!sid || !gid) {
-      setError("Talaba ID va guruh ID kiriting.");
+      setError("Enter both student ID and group ID.");
       return;
     }
     setLoading(true);
@@ -101,11 +101,10 @@ export default function TeacherInsightsPage() {
     <div className="space-y-10">
       <div>
         <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
-          Insights va xavf
+          Insights and risk
         </h1>
         <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
-          Guruh ID kiriting, insightlarni yuklang yoki talaba bo&apos;yicha xavf
-          tahlilini oching.
+          Enter a group ID to load insights, or run risk analytics for a student.
         </p>
       </div>
 
@@ -113,11 +112,11 @@ export default function TeacherInsightsPage() {
 
       <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
         <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
-          Guruh
+          Group
         </h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <input
-            placeholder="guruh ID"
+            placeholder="group ID"
             value={groupId}
             onChange={(e) => setGroupId(e.target.value)}
             className="min-w-[240px] flex-1 rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm dark:border-neutral-600 dark:bg-neutral-950"
@@ -128,7 +127,7 @@ export default function TeacherInsightsPage() {
             disabled={loading}
             className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
           >
-            {loading ? "Yuklanmoqda…" : "Insights yuklash"}
+            {loading ? "Loading..." : "Load insights"}
           </button>
           <button
             type="button"
@@ -136,14 +135,14 @@ export default function TeacherInsightsPage() {
             disabled={recomputeBusy}
             className="rounded-md border border-neutral-300 px-4 py-2 text-sm dark:border-neutral-600"
           >
-            {recomputeBusy ? "Hisoblanmoqda…" : "Tahlilni qayta hisoblash"}
+            {recomputeBusy ? "Recomputing..." : "Recompute analytics"}
           </button>
         </div>
       </section>
 
       <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
         <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
-          Insights ro&apos;yxati
+          Insight list
         </h2>
         <ul className="mt-4 space-y-3">
           {insights.map((ins) => (
@@ -173,14 +172,14 @@ export default function TeacherInsightsPage() {
                   onClick={() => void handleStatus(ins, "acknowledged")}
                   className="rounded bg-green-700 px-2 py-1 text-xs text-white dark:bg-green-600"
                 >
-                  Qabul
+                  Acknowledge
                 </button>
                 <button
                   type="button"
                   onClick={() => void handleStatus(ins, "dismissed")}
                   className="rounded bg-neutral-600 px-2 py-1 text-xs text-white dark:bg-neutral-500"
                 >
-                  Yopish
+                  Dismiss
                 </button>
               </div>
             </li>
@@ -199,17 +198,17 @@ export default function TeacherInsightsPage() {
 
       <section className="rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
         <h2 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
-          Xavf (talaba)
+          Risk (student)
         </h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <input
-            placeholder="talaba ID"
+            placeholder="student ID"
             value={studentId}
             onChange={(e) => setStudentId(e.target.value)}
             className="min-w-[200px] rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm dark:border-neutral-600 dark:bg-neutral-950"
           />
           <input
-            placeholder="guruh ID (bo'sh bo'lsa yuqoridagi)"
+            placeholder="group ID (leave empty to use above)"
             value={riskGroupId}
             onChange={(e) => setRiskGroupId(e.target.value)}
             className="min-w-[200px] rounded-md border border-neutral-300 px-3 py-2 font-mono text-sm dark:border-neutral-600 dark:bg-neutral-950"
@@ -220,7 +219,7 @@ export default function TeacherInsightsPage() {
             disabled={loading}
             className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white dark:bg-neutral-100 dark:text-neutral-900"
           >
-            Xavfni olish
+            Get risk
           </button>
         </div>
         {riskJson && (

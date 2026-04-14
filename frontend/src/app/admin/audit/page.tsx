@@ -92,24 +92,24 @@ export default function AdminAuditPage() {
         </p>
       </div>
 
-      {/* ── O'qituvchilar va tuzilma ── */}
+      {/* ── Teachers and structure ── */}
       <section className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-700 dark:bg-neutral-900">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-            O{"'"}qituvchilar ro{"'"}yxati
+            Teacher list
           </h2>
           <button
             type="button"
             onClick={() => void loadOverview()}
             className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-300 dark:hover:bg-neutral-800"
           >
-            Yangilash
+            Refresh
           </button>
         </div>
 
         {teachers.length === 0 ? (
           <p className="mt-3 text-sm text-neutral-500">
-            Hali o{"'"}qituvchi yo{"'"}q.
+            No teachers yet.
           </p>
         ) : (
           <div className="mt-3 overflow-x-auto">
@@ -117,7 +117,7 @@ export default function AdminAuditPage() {
               <thead>
                 <tr className="border-b border-neutral-200 text-left text-xs font-medium uppercase tracking-wider text-neutral-500 dark:border-neutral-700">
                   <th className="pb-2 pr-4">#</th>
-                  <th className="pb-2 pr-4">Ism Familya</th>
+                  <th className="pb-2 pr-4">Full name</th>
                   <th className="pb-2 pr-4">Email</th>
                   <th className="pb-2 pr-4">ID</th>
                 </tr>
@@ -148,7 +148,7 @@ export default function AdminAuditPage() {
         {subjects.length > 0 && (
           <div className="mt-5 border-t border-neutral-200 pt-4 dark:border-neutral-700">
             <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
-              Fanlar va guruhlar
+              Subjects and groups
             </h3>
             <div className="mt-2 space-y-2">
               {subjects.map((s) => (
@@ -172,7 +172,7 @@ export default function AdminAuditPage() {
         )}
 
         <p className="mt-3 text-xs text-neutral-400">
-          Parollar xavfsizlik uchun ko{"'"}rsatilmaydi.
+          Passwords are hidden for security.
         </p>
       </section>
 

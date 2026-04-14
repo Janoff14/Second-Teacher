@@ -104,18 +104,18 @@ export default function TakeAssessmentPage() {
             <svg className="h-8 w-8 text-emerald-600 dark:text-emerald-300" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
           <h2 className="mt-4 text-2xl font-semibold text-emerald-900 dark:text-emerald-100">
-            Javobingiz qabul qilindi!
+            Your attempt was submitted!
           </h2>
           {result ? (
             <div className="mt-4">
               <p className="text-4xl font-bold text-emerald-800 dark:text-emerald-200">{result.pct}%</p>
               <p className="mt-1 text-sm text-emerald-700/70 dark:text-emerald-300/70">
-                {result.score} / {result.maxScore} ball
+                {result.score} / {result.maxScore} points
               </p>
             </div>
           ) : null}
           <p className="mt-4 text-sm text-emerald-800/80 dark:text-emerald-200/80">
-            Natijangiz saqlandi. Fan sahifangizda yangilangan tahlil va AI tavsiyalarni ko&apos;ring.
+            Your result is saved. Open your subject workspace for updated analytics and AI suggestions.
           </p>
         </div>
 
@@ -129,10 +129,10 @@ export default function TakeAssessmentPage() {
               </div>
               <div>
                 <h3 className="text-base font-semibold text-amber-900 dark:text-amber-100">
-                  Darslikdan o&apos;qish tavsiyalari
+                  Recommended textbook reading
                 </h3>
                 <p className="text-sm text-amber-700 dark:text-amber-300">
-                  Noto&apos;g&apos;ri javob bergan savollaringiz uchun darslikdagi tegishli bo&apos;limlar
+                  Relevant sections for questions you missed
                 </p>
               </div>
             </div>
@@ -150,7 +150,7 @@ export default function TakeAssessmentPage() {
                     {rec.chapterTitle && (
                       <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                         {rec.chapterTitle}
-                        {rec.pageNumber ? ` — ${rec.pageNumber}-sahifa` : ""}
+                        {rec.pageNumber ? ` — page ${rec.pageNumber}` : ""}
                       </span>
                     )}
                     {rec.textbookTitle && (
@@ -171,7 +171,7 @@ export default function TakeAssessmentPage() {
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                     </svg>
-                    Darslikda ochish
+                    Open in reader
                   </Link>
                 </div>
               ))}
@@ -184,7 +184,7 @@ export default function TakeAssessmentPage() {
             href={backHref}
             className="rounded-full bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white dark:bg-neutral-100 dark:text-neutral-900"
           >
-            Fanga qaytish
+            Back to subject
           </Link>
           <Link
             href={`/student/assessments/take/${publishedId}`}
@@ -197,7 +197,7 @@ export default function TakeAssessmentPage() {
             }}
             className="rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-900"
           >
-            Qayta topshirish
+            Retake
           </Link>
         </div>
       </div>

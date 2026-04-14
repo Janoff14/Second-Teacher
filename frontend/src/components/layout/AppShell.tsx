@@ -18,8 +18,8 @@ const adminTabs: NavItem[] = [
 ];
 
 const teacherTabs: NavItem[] = [
-  { href: "/teacher", label: "Bosh panel" },
-  { href: "/notifications", label: "Bildirishnomalar" },
+  { href: "/teacher", label: "Dashboard" },
+  { href: "/notifications", label: "Notifications" },
 ];
 
 const studentTabs: NavItem[] = [
@@ -180,7 +180,7 @@ export function AppShell({
               onClick={handleLogout}
               className="rounded-md border border-neutral-300 px-3 py-1.5 text-neutral-800 hover:bg-neutral-50 dark:border-neutral-600 dark:text-neutral-200 dark:hover:bg-neutral-900"
             >
-              Chiqish
+              Sign out
             </button>
           </div>
         </div>

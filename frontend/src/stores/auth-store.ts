@@ -64,7 +64,7 @@ export function getAccessToken(): string | null {
   return useAuthStore.getState().accessToken;
 }
 
-/** Login `user.id` yoki JWT `sub` — o‘qituvchi guruh filtri uchun. */
+/** Login `user.id` or JWT `sub` — for teacher group filtering. */
 export function getResolvedUserId(): string | null {
   const { userId, accessToken, role } = useAuthStore.getState();
   if (userId) return userId;

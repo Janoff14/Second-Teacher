@@ -13,32 +13,43 @@ export default function HomePage() {
             Second Teacher
           </h1>
           <p className="mt-3 text-lg text-neutral-600 dark:text-neutral-400">
-            O{"'"}qituvchi va talabalarga mo{"'"}ljallangan platforma: fan tuzilmasi, darslik
-            asosidagi qidiruv (RAG), baholash, insights va AI yordamchisi.
+            A teaching and learning platform with subject structure, textbook-grounded
+            search (RAG), assessments, insights, and AI coaching.
           </p>
           <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-500">
-            Demo tartibi va API ketma-ketligi{" "}
+            Demo workflow and API sequence are aligned with the{" "}
             <Link
               href="/guide"
               className="font-medium text-blue-600 underline-offset-2 hover:underline dark:text-blue-400"
             >
               platform workflow
             </Link>{" "}
-            hujjati bilan moslashtirilgan.
+            guide.
           </p>
         </div>
 
         <div className="mt-10">
           <p className="mb-3 text-center text-xs font-semibold uppercase tracking-wide text-neutral-500">
-            Tavsiya etilgan oqim (golden path)
+            Recommended flow (golden path)
           </p>
           <GoldenPathVisual />
         </div>
 
-        <div className="mt-12">
+        <div id="role-selection" className="mt-12 scroll-mt-24">
           <h2 className="mb-4 text-center text-sm font-semibold text-neutral-800 dark:text-neutral-200">
-            Kim sifatida kirmoqchisiz?
+            Which role do you want to use?
           </h2>
+          <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-left text-sm text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-100">
+            <p className="font-semibold">Demo accounts</p>
+            <p className="mt-1">
+              You can test how the platform looks and works using our demo accounts,
+              already filled with data.
+            </p>
+            <ul className="mt-3 space-y-1 font-mono text-xs sm:text-sm">
+              <li>Student: lila.kim_demo@secondteacher.dev / DemoSeed2026!</li>
+              <li>Teacher: kamila.saidova_demo@secondteacher.dev / DemoSeed2026!</li>
+            </ul>
+          </div>
           <RoleEntryCards />
         </div>
       </div>

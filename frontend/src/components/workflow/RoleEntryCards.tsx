@@ -2,28 +2,28 @@ import Link from "next/link";
 
 const cards = [
   {
-    title: "O\u2018qituvchi",
-    desc: "Admin tomonidan berilgan email va parol bilan kiring.",
+    title: "Teacher",
+    desc: "Sign in with a teacher demo account.",
     href: "/login?role=teacher",
     accent:
       "border-emerald-200/90 bg-emerald-50/80 hover:border-emerald-300 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:hover:border-emerald-800",
-    cta: "Kirish",
+    cta: "Sign in",
   },
   {
-    title: "Talaba",
-    desc: "Sinf kodi bilan qo\u2018shiling, test va o\u2018rganish.",
-    href: "/join",
+    title: "Student",
+    desc: "Sign in with a student demo account and explore assessments.",
+    href: "/login?role=student",
     accent:
       "border-violet-200/90 bg-violet-50/80 hover:border-violet-300 dark:border-violet-900/60 dark:bg-violet-950/30 dark:hover:border-violet-800",
-    cta: "Kod bilan qo\u2018shilish",
+    cta: "Sign in",
   },
   {
     title: "Administrator",
-    desc: "Tuzilma va (ixtiyoriy) audit.",
+    desc: "Manage structure and optional audit tools.",
     href: "/login?role=admin",
     accent:
       "border-amber-200/90 bg-amber-50/80 hover:border-amber-300 dark:border-amber-900/60 dark:bg-amber-950/30 dark:hover:border-amber-800",
-    cta: "Kirish",
+    cta: "Sign in",
   },
 ] as const;
 

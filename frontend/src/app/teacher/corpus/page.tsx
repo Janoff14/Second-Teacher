@@ -5,7 +5,7 @@ export default function TeacherCorpusPage() {
   return (
     <Suspense
       fallback={
-        <p className="text-sm text-neutral-500">Yuklanmoqda\u2026</p>
+        <p className="text-sm text-neutral-500">Loading...</p>
       }
     >
       <CorpusClient />

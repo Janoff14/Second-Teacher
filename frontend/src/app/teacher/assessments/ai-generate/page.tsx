@@ -129,14 +129,14 @@ export default function AiGenerateTestPage() {
           href="/teacher/assessments"
           className="text-sm text-blue-600 hover:underline dark:text-blue-400"
         >
-          &larr; Baholashlarga qaytish
+          &larr; Back to assessments
         </Link>
         <h1 className="text-2xl font-semibold text-neutral-900 dark:text-neutral-50">
-          AI bilan test yaratish
+          Generate test with AI
         </h1>
         <p className="text-sm text-neutral-600 dark:text-neutral-400">
-          Darslik tanlang, mavzularni belgilang — AI savollarni avtomatik yaratadi.
-          Yaratilgan savollarni ko&apos;rib chiqib, tahrirlashingiz mumkin.
+          Select a textbook and topics — AI will generate questions automatically.
+          You can review and edit the generated items before publishing.
         </p>
       </div>
 
@@ -160,10 +160,10 @@ export default function AiGenerateTestPage() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-emerald-900 dark:text-emerald-100">
-                  Test muvaffaqiyatli yaratildi!
+                  Test generated successfully!
                 </h2>
                 <p className="text-sm text-emerald-700 dark:text-emerald-300">
-                  {result.generation.itemsGenerated} ta savol yaratildi &mdash; &quot;{result.generation.textbookTitle}&quot; darsligidan
+                  {result.generation.itemsGenerated} questions generated from &quot;{result.generation.textbookTitle}&quot;
                 </p>
               </div>
             </div>
@@ -172,19 +172,19 @@ export default function AiGenerateTestPage() {
                 <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">
                   {result.generation.itemsGenerated}
                 </p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-400">Savollar</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">Questions</p>
               </div>
               <div className="rounded-xl bg-emerald-100/60 px-3 py-2 text-center dark:bg-emerald-900/30">
                 <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">
                   {result.generation.topicsUsed.length}
                 </p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-400">Mavzular</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">Topics</p>
               </div>
               <div className="rounded-xl bg-emerald-100/60 px-3 py-2 text-center dark:bg-emerald-900/30">
                 <p className="text-2xl font-bold text-emerald-800 dark:text-emerald-200">
                   {result.generation.chunksRetrieved}
                 </p>
-                <p className="text-xs text-emerald-600 dark:text-emerald-400">Darslik bo&apos;laklari</p>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">Textbook chunks</p>
               </div>
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
@@ -193,14 +193,14 @@ export default function AiGenerateTestPage() {
                 onClick={handleGoToDraft}
                 className="rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500"
               >
-                Ko&apos;rib chiqish va tahrirlash
+                Review and edit
               </button>
               <button
                 type="button"
                 onClick={() => setResult(null)}
                 className="rounded-xl border border-neutral-300 px-5 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-900"
               >
-                Yana yaratish
+                Generate another
               </button>
             </div>
           </div>
@@ -210,11 +210,11 @@ export default function AiGenerateTestPage() {
           {/* Subject & Class selection */}
           <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
             <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
-              1. Fan va sinf tanlang
+              1. Select subject and class
             </h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="text-sm text-neutral-700 dark:text-neutral-300">Fan</label>
+                <label className="text-sm text-neutral-700 dark:text-neutral-300">Subject</label>
                 <select
                   value={subjectId}
                   onChange={(e) => {
@@ -224,21 +224,21 @@ export default function AiGenerateTestPage() {
                   }}
                   className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2.5 text-sm dark:border-neutral-600 dark:bg-neutral-950"
                 >
-                  <option value="">Fan tanlang...</option>
+                  <option value="">Select subject...</option>
                   {subjects.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-sm text-neutral-700 dark:text-neutral-300">Sinf</label>
+                <label className="text-sm text-neutral-700 dark:text-neutral-300">Class</label>
                 <select
                   value={groupId}
                   onChange={(e) => setGroupId(e.target.value)}
                   disabled={!subjectId}
                   className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2.5 text-sm disabled:opacity-50 dark:border-neutral-600 dark:bg-neutral-950"
                 >
-                  <option value="">Sinf tanlang...</option>
+                  <option value="">Select class...</option>
                   {groups.map((g) => (
                     <option key={g.id} value={g.id}>{g.name}</option>
                   ))}
@@ -250,11 +250,11 @@ export default function AiGenerateTestPage() {
           {/* Textbook selection */}
           <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
             <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
-              2. Darslik tanlang
+              2. Select textbook
             </h2>
             {textbooks.length === 0 && subjectId ? (
               <p className="mt-3 text-sm text-neutral-500">
-                Bu fanda darslik topilmadi. Avval darslik yuklang.
+                No textbook found for this subject. Upload one first.
               </p>
             ) : (
               <div className="mt-4 space-y-2">
@@ -284,7 +284,7 @@ export default function AiGenerateTestPage() {
                     <div>
                       <p className="font-medium">{tb.title}</p>
                       <p className="text-xs text-neutral-500">
-                        Versiya: {tb.versionLabel}
+                        Version: {tb.versionLabel}
                         {tb.sourceFormat ? ` (${tb.sourceFormat})` : ""}
                       </p>
                     </div>
@@ -297,10 +297,10 @@ export default function AiGenerateTestPage() {
           {/* Topic selection */}
           <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
             <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
-              3. Mavzularni tanlang
+              3. Select topics
             </h2>
             <p className="mt-1 text-sm text-neutral-500">
-              Darslikdagi boblardan tanlang yoki o&apos;z mavzuingizni qo&apos;shing.
+              Pick from textbook chapters or add your own topic.
             </p>
 
             {availableTopics.length > 0 && (
@@ -325,7 +325,7 @@ export default function AiGenerateTestPage() {
 
             <div className="mt-4 flex gap-2">
               <input
-                placeholder="Maxsus mavzu qo'shing..."
+                placeholder="Add custom topic..."
                 value={customTopic}
                 onChange={(e) => setCustomTopic(e.target.value)}
                 onKeyDown={(e) => {
@@ -341,14 +341,14 @@ export default function AiGenerateTestPage() {
                 onClick={addCustomTopic}
                 className="rounded-xl border border-neutral-300 px-4 py-2 text-sm dark:border-neutral-600"
               >
-                Qo&apos;shish
+                Add
               </button>
             </div>
 
             {selectedTopics.length > 0 && (
               <div className="mt-3">
                 <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
-                  Tanlangan mavzular ({selectedTopics.length}):
+                  Selected topics ({selectedTopics.length}):
                 </p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {selectedTopics.map((topic) => (
@@ -374,12 +374,12 @@ export default function AiGenerateTestPage() {
           {/* Configuration */}
           <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-950/70">
             <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-50">
-              4. Sozlamalar
+              4. Settings
             </h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
               <div>
                 <label className="text-sm text-neutral-700 dark:text-neutral-300">
-                  Savollar soni
+                  Number of questions
                 </label>
                 <input
                   type="number"
@@ -392,26 +392,26 @@ export default function AiGenerateTestPage() {
               </div>
               <div>
                 <label className="text-sm text-neutral-700 dark:text-neutral-300">
-                  Qiyinlik darajasi
+                  Difficulty
                 </label>
                 <select
                   value={difficulty}
                   onChange={(e) => setDifficulty(e.target.value as "easy" | "medium" | "hard")}
                   className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2.5 text-sm dark:border-neutral-600 dark:bg-neutral-950"
                 >
-                  <option value="easy">Oson</option>
-                  <option value="medium">O&apos;rtacha</option>
-                  <option value="hard">Qiyin</option>
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
                 </select>
               </div>
               <div>
                 <label className="text-sm text-neutral-700 dark:text-neutral-300">
-                  Test sarlavhasi (ixtiyoriy)
+                  Test title (optional)
                 </label>
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="masalan: 3-bob bo'yicha test"
+                  placeholder="e.g. Chapter 3 quiz"
                   className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2.5 text-sm dark:border-neutral-600 dark:bg-neutral-950"
                 />
               </div>
@@ -428,15 +428,15 @@ export default function AiGenerateTestPage() {
               {generating ? (
                 <span className="flex items-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Yaratilmoqda...
+                  Generating...
                 </span>
               ) : (
-                "AI bilan test yaratish"
+                "Generate with AI"
               )}
             </button>
             {generating && (
               <p className="text-sm text-neutral-500">
-                AI darslikni tahlil qilib, savollar yaratmoqda. Bu bir necha soniya davom etishi mumkin...
+                AI is analyzing the textbook and generating questions. This may take a few seconds...
               </p>
             )}
           </div>

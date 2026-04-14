@@ -15,7 +15,13 @@ export function PublicNav() {
             href="/guide"
             className="text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
           >
-            Platform yo{"'"}riqnomasi
+            Platform guide
+          </Link>
+          <Link
+            href="/#role-selection"
+            className="rounded-full bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+          >
+            Choose role
           </Link>
         </nav>
       </div>

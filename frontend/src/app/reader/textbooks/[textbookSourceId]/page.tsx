@@ -218,7 +218,7 @@ export default function ReaderPage() {
       setAssetUrl(null);
       setAssetError(null);
 
-      if (!document?.asset.available) {
+      if (!document?.asset?.available) {
         setAssetLoading(false);
         return;
       }
@@ -254,9 +254,9 @@ export default function ReaderPage() {
 
   const backHref = useMemo(() => resolveBackHref(role, groupId), [role, groupId]);
   const isPdf = Boolean(
-    document?.asset.available &&
-      (document.source.sourceFormat === "pdf" ||
-        (document.asset.available && document.asset.mimeType === "application/pdf")),
+    document?.asset?.available &&
+      (document?.source?.sourceFormat === "pdf" ||
+        document?.asset?.mimeType === "application/pdf"),
   );
   const activeChapter = useMemo(
     () => (document ? getChapterForPage(document.chapters, selectedPage) : null),
@@ -267,7 +267,9 @@ export default function ReaderPage() {
     if (!isPdf) return assetUrl;
     return `${assetUrl}#page=${selectedPage}&view=FitH`;
   }, [assetUrl, isPdf, selectedPage]);
-  const showTextFallback = Boolean(document && (!document.asset.available || assetError));
+  const showTextFallback = Boolean(
+    document && (!document.asset?.available || assetError),
+  );
 
   if (loading) {
     return <p className="text-sm text-neutral-500">Loading textbook reader...</p>;
@@ -436,7 +438,7 @@ export default function ReaderPage() {
                 />
               ) : (
                 <div className="flex min-h-[72vh] items-center justify-center px-6 text-center text-sm text-neutral-500 dark:text-neutral-400">
-                  {document.asset.available
+                  {document.asset?.available
                     ? assetError ?? "The original document could not be loaded."
                     : "This textbook was indexed before the original file was stored for reader preview."}
                 </div>
@@ -460,7 +462,7 @@ export default function ReaderPage() {
           {showTextFallback ? (
             <TextFallbackSection
               document={document}
-              reason={document.asset.available ? "asset-error" : "missing-asset"}
+              reason={document.asset?.available ? "asset-error" : "missing-asset"}
               selectedPage={selectedPage}
             />
           ) : null}

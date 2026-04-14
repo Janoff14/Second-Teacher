@@ -1,11 +1,11 @@
 import Link from "next/link";
 
 const STEPS = [
-  { label: "Tuzilma", hint: "fan, guruh, kod", wf: "WF-ACADEMIC" },
-  { label: "Darslik + RAG", hint: "yuklash va qidiruv", wf: "WF-CORPUS-*" },
-  { label: "Qo\u2018shilish", hint: "talaba", wf: "WF-JOIN" },
-  { label: "Baholash", hint: "testlar", wf: "WF-ASSESS-*" },
-  { label: "Insights", hint: "xavf / feed", wf: "WF-INSIGHTS-*" },
+  { label: "Structure", hint: "subject, group, code", wf: "WF-ACADEMIC" },
+  { label: "Textbook + RAG", hint: "ingest and search", wf: "WF-CORPUS-*" },
+  { label: "Join", hint: "student", wf: "WF-JOIN" },
+  { label: "Assessments", hint: "tests", wf: "WF-ASSESS-*" },
+  { label: "Insights", hint: "risk / feed", wf: "WF-INSIGHTS-*" },
   { label: "Agent", hint: "chat", wf: "WF-AGENT-*" },
 ] as const;
 
@@ -32,9 +32,9 @@ export function GoldenPathVisual() {
         ))}
       </ol>
       <p className="mt-3 text-center text-xs text-neutral-500 dark:text-neutral-400">
-        Batafsil:{" "}
+        Details:{" "}
         <Link href="/guide" className="text-blue-600 underline dark:text-blue-400">
-          Platform yo{"'"}riqnomasi
+          Platform guide
         </Link>{" "}
         (repo: <span className="font-mono text-[10px]">platform-user-workflow.md</span>).
       </p>

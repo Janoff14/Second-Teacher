@@ -21,19 +21,51 @@ function ErrorBox({ message }: { message: string | null }) {
   );
 }
 
-type RoleHint = "teacher" | "admin" | null;
+type RoleHint = "teacher" | "student" | "admin" | null;
 
 function roleHeading(hint: RoleHint): string {
-  if (hint === "teacher") return "O\u2018qituvchi sifatida kirish";
-  if (hint === "admin") return "Administrator sifatida kirish";
-  return "Kirish";
+  if (hint === "teacher") return "Sign in as Teacher";
+  if (hint === "student") return "Sign in as Student";
+  if (hint === "admin") return "Sign in as Administrator";
+  return "Sign in";
 }
 
 function roleDescription(hint: RoleHint): string {
-  if (hint === "teacher")
-    return "Admin tomonidan berilgan ism familya, email va parol bilan kiring.";
-  if (hint === "admin") return "Administrator email va parol bilan kiring.";
-  return "Email va parol bilan kiring.";
+  if (hint === "teacher") return "Use your teacher email and password.";
+  if (hint === "student") return "Use your student demo account to explore the platform.";
+  if (hint === "admin") return "Use your administrator email and password.";
+  return "Use your email and password.";
+}
+
+function demoAccountsForRole(hint: RoleHint): Array<{ role: string; email: string; password: string }> {
+  if (hint === "student") {
+    return [
+      {
+        role: "Student",
+        email: "lila.kim_demo@secondteacher.dev",
+        password: "DemoSeed2026!",
+      },
+    ];
+  }
+  if (hint === "teacher") {
+    return [
+      {
+        role: "Teacher",
+        email: "kamila.saidova_demo@secondteacher.dev",
+        password: "DemoSeed2026!",
+      },
+    ];
+  }
+  if (hint === "admin") {
+    return [
+      {
+        role: "Admin",
+        email: "admin@secondteacher.dev",
+        password: "ChangeMe123!",
+      },
+    ];
+  }
+  return [];
 }
 
 function LoginContent() {
@@ -42,6 +74,7 @@ function LoginContent() {
   const sessionExpired = searchParams.get("session") === "expired";
   const roleHint = (searchParams.get("role") as RoleHint) ?? null;
   const isTeacher = roleHint === "teacher";
+  const demoAccounts = demoAccountsForRole(roleHint);
   const setSession = useAuthStore((s) => s.setSession);
 
   const [displayName, setDisplayName] = useState("");
@@ -68,7 +101,7 @@ function LoginContent() {
     const session = sessionFromAuthResponse(res.data);
     if (!session) {
       setError(
-        "Kutilmagan javob \u2014 session.ts ni API ga moslashtiring.",
+        "Unexpected login response. Please align session parsing with the API shape.",
       );
       return;
     }
@@ -95,26 +128,23 @@ function LoginContent() {
 
       {sessionExpired && (
         <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100">
-          Sessiya tugadi (401). Qayta kiring.
+          Session expired (401). Please sign in again.
         </p>
       )}
 
-      {process.env.NODE_ENV === "development" && (
-        <p className="mt-4 rounded-md border border-neutral-600 bg-neutral-900/50 px-3 py-2 text-xs leading-relaxed text-neutral-400">
-          <span className="font-medium text-neutral-300">Dev</span>:{" "}
-          <code className="text-neutral-300">demo.seed.teacher@secondteacher.dev</code> va barcha{" "}
-          <code className="text-neutral-300">demo.seed.s*</code> studentlar paroli{" "}
-          <code className="text-neutral-300">DemoSeed2026!</code>;{" "}
-          <code className="text-neutral-300">teacher@secondteacher.dev</code> uchun{" "}
-          <code className="text-neutral-300">ChangeMe123!</code>. &quot;Ism Familya&quot; faqat forma; login
-          API ga email va parol yuboriladi. Boshqa kompyuterda ishlagan bo&apos;lsa,{" "}
-          <code className="text-neutral-300">frontend/.env.local</code> ichidagi{" "}
-          <code className="text-neutral-300">NEXT_PUBLIC_API_BASE_URL</code> shu yerdagi backend ga
-          ishora qilishi kerak (odatda <code className="text-neutral-300">http://localhost:4000</code>).
-          Backendda <code className="text-neutral-300">SUPABASE_*</code> yoqilgan bo&apos;lsa,
-          foydalanuvchilar boshqa muhitdagi kabi bo&apos;lmasligi mumkin.
-        </p>
-      )}
+      {demoAccounts.length > 0 ? (
+        <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-100">
+          <span className="font-semibold">Demo account</span>: use this pre-filled account to test the
+          platform with existing data.
+          <ul className="mt-2 space-y-1 font-mono">
+            {demoAccounts.map((account) => (
+              <li key={account.email}>
+                {account.role}: {account.email} / {account.password}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <ErrorBox message={error} />
 
@@ -125,13 +155,13 @@ function LoginContent() {
               htmlFor="displayName"
               className="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
             >
-              Ism Familya
+              Full name
             </label>
             <input
               id="displayName"
               type="text"
               autoComplete="name"
-              placeholder="Abdullayev Jasur"
+              placeholder="Jane Doe"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
@@ -145,7 +175,7 @@ function LoginContent() {
             htmlFor="email"
             className="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
           >
-            Elektron pochta
+            Email
           </label>
             <input
               id="email"
@@ -164,7 +194,7 @@ function LoginContent() {
             htmlFor="password"
             className="block text-sm font-medium text-neutral-700 dark:text-neutral-300"
           >
-            Parol
+            Password
           </label>
             <input
               id="password"
@@ -183,13 +213,13 @@ function LoginContent() {
           disabled={loading}
           className="w-full rounded-md bg-neutral-900 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-neutral-100 dark:text-neutral-900"
         >
-          {loading ? "Kirilmoqda\u2026" : "Kirish"}
+          {loading ? "Signing in..." : "Sign in"}
         </button>
       </form>
 
       <p className="mt-8 text-sm">
         <Link href="/" className="text-blue-600 hover:underline dark:text-blue-400">
-          &larr; Bosh sahifa
+          &larr; Home
         </Link>
       </p>
     </div>
@@ -199,7 +229,7 @@ function LoginContent() {
 export default function LoginPage() {
   return (
     <Suspense
-      fallback={<div className="p-8 text-sm text-neutral-500">Yuklanmoqda&hellip;</div>}
+      fallback={<div className="p-8 text-sm text-neutral-500">Loading&hellip;</div>}
     >
       <LoginContent />
     </Suspense>

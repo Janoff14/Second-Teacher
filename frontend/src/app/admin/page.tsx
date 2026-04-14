@@ -76,10 +76,10 @@ export default function AdminDashboardPage() {
         return;
       }
       setCreateSuccess(
-        `O\u2018qituvchi "${displayName}" yaratildi!\n` +
+        `Teacher "${displayName}" created!\n` +
         `Email: ${email}\n` +
-        `Parol: ${password}\n` +
-        `Shu ma\u2018lumotlarni nusxa oling \u2014 parol keyinchalik ko\u2018rsatilmaydi!`,
+        `Password: ${password}\n` +
+        `Copy these credentials now — the password is not shown again later.`,
       );
       setTName("");
       setTEmail("");
@@ -204,10 +204,10 @@ export default function AdminDashboardPage() {
       {/* ── 1. Create teacher ── */}
       <section className="rounded-xl border border-violet-200 bg-violet-50/40 p-5 dark:border-violet-900/60 dark:bg-violet-950/20">
         <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-          1. O{"'"}qituvchi qo{"'"}shish
+          1. Add teacher
         </h2>
         <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-          Ism, email va parol kiriting.
+          Enter full name, email, and password.
         </p>
 
         <ErrorBox message={createError} />
@@ -219,7 +219,7 @@ export default function AdminDashboardPage() {
         >
           <label className="space-y-1 text-sm">
             <span className="font-medium text-neutral-700 dark:text-neutral-300">
-              Ism Familya
+              Full name
             </span>
             <input
               type="text"
@@ -245,7 +245,7 @@ export default function AdminDashboardPage() {
           </label>
           <div className="space-y-1 text-sm">
             <span className="font-medium text-neutral-700 dark:text-neutral-300">
-              Parol
+              Password
             </span>
             <div className="relative">
               <input
@@ -261,7 +261,7 @@ export default function AdminDashboardPage() {
                 onClick={() => setShowPassword((v) => !v)}
                 className="absolute right-1 top-1/2 -translate-y-1/2 rounded px-2 py-1 text-xs font-medium text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
               >
-                {showPassword ? "Yashirish" : "Ko\u2018rsatish"}
+                {showPassword ? "Hide" : "Show"}
               </button>
             </div>
           </div>
@@ -271,36 +271,36 @@ export default function AdminDashboardPage() {
               disabled={creating || !tName.trim() || !tEmail.trim() || !tPassword.trim()}
               className="rounded-md bg-violet-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-violet-600"
             >
-              {creating ? "Yaratilmoqda\u2026" : "O\u2018qituvchi yaratish"}
+              {creating ? "Creating..." : "Create teacher"}
             </button>
           </div>
         </form>
       </section>
 
-      {/* ── 2. Fan yaratish ── */}
+      {/* ── 2. Create subject ── */}
       <section className="rounded-xl border border-emerald-200 bg-emerald-50/40 p-5 dark:border-emerald-900/60 dark:bg-emerald-950/20">
         <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-          2. Fan yaratish
+          2. Create subject
         </h2>
         <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-          Yangi fan nomini kiriting va yarating.
+          Enter a new subject name and create it.
         </p>
 
         <ErrorBox message={!selectedSubjectId ? assignError : null} />
         {selectedSubjectId && (
           <SuccessBox
-            message={`Fan tanlandi: ${subjects.find((s) => s.id === selectedSubjectId)?.name ?? selectedSubjectId}`}
+            message={`Selected subject: ${subjects.find((s) => s.id === selectedSubjectId)?.name ?? selectedSubjectId}`}
           />
         )}
 
         <div className="mt-4 flex flex-wrap items-end gap-2">
           <label className="flex-1 space-y-1 text-sm">
             <span className="font-medium text-neutral-700 dark:text-neutral-300">
-              Fan nomi
+              Subject name
             </span>
             <input
               type="text"
-              placeholder="masalan: Matematika"
+              placeholder="e.g. Mathematics"
               value={newSubjectName}
               onChange={(e) => setNewSubjectName(e.target.value)}
               className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
@@ -312,37 +312,37 @@ export default function AdminDashboardPage() {
             disabled={loadingStructure || !newSubjectName.trim()}
             className="rounded-md bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-emerald-600"
           >
-            + Fan yaratish
+            + Create subject
           </button>
         </div>
       </section>
 
-      {/* ── 3. Guruh yaratish ── */}
+      {/* ── 3. Create group ── */}
       <section className={`rounded-xl border p-5 transition ${selectedSubjectId ? "border-amber-200 bg-amber-50/40 dark:border-amber-900/60 dark:bg-amber-950/20" : "border-neutral-200 bg-neutral-50/30 opacity-60 dark:border-neutral-800 dark:bg-neutral-900/30"}`}>
         <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-          3. Guruh yaratish
+          3. Create group
         </h2>
         <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
           {selectedSubjectId
-            ? `Tanlangan fan: ${subjects.find((s) => s.id === selectedSubjectId)?.name ?? selectedSubjectId}`
-            : "Avval fan yarating (2-qadam)."}
+            ? `Selected subject: ${subjects.find((s) => s.id === selectedSubjectId)?.name ?? selectedSubjectId}`
+            : "Create a subject first (step 2)."}
         </p>
 
         {selectedSubjectId && (
           <>
             {selectedGroupId && (
               <SuccessBox
-                message={`Guruh tanlandi: ${groups.find((g) => g.id === selectedGroupId)?.name ?? selectedGroupId}`}
+                message={`Selected group: ${groups.find((g) => g.id === selectedGroupId)?.name ?? selectedGroupId}`}
               />
             )}
             <div className="mt-4 flex flex-wrap items-end gap-2">
               <label className="flex-1 space-y-1 text-sm">
                 <span className="font-medium text-neutral-700 dark:text-neutral-300">
-                  Guruh nomi
+                  Group name
                 </span>
                 <input
                   type="text"
-                  placeholder="masalan: 101-guruh"
+                  placeholder="e.g. Group 101"
                   value={newGroupName}
                   onChange={(e) => setNewGroupName(e.target.value)}
                   className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
@@ -354,20 +354,20 @@ export default function AdminDashboardPage() {
                 disabled={loadingStructure || !newGroupName.trim()}
                 className="rounded-md bg-amber-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-amber-600"
               >
-                + Guruh yaratish
+                + Create group
               </button>
             </div>
           </>
         )}
       </section>
 
-      {/* ── 4. O'qituvchiga biriktirish ── */}
+      {/* ── 4. Assign teacher ── */}
       <section className={`rounded-xl border p-5 transition ${selectedGroupId && assignTeacherId ? "border-blue-200 bg-blue-50/40 dark:border-blue-900/60 dark:bg-blue-950/20" : "border-neutral-200 bg-neutral-50/30 dark:border-neutral-800 dark:bg-neutral-900/30"}`}>
         <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
-          4. O{"'"}qituvchiga biriktirish
+          4. Assign teacher
         </h2>
         <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
-          Fan, guruh va teacher ID ni tekshirib, Assign bosing.
+          Confirm subject, group, and teacher, then assign.
         </p>
 
         <ErrorBox message={assignError} />
@@ -380,14 +380,14 @@ export default function AdminDashboardPage() {
           <div className="grid gap-3 sm:grid-cols-3">
             <label className="space-y-1 text-sm">
               <span className="font-medium text-neutral-700 dark:text-neutral-300">
-                O{"'"}qituvchi
+                Teacher
               </span>
               <select
                 value={assignTeacherId}
                 onChange={(e) => setAssignTeacherId(e.target.value)}
                 className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
               >
-                <option value="">O{"'"}qituvchi tanlang&hellip;</option>
+                <option value="">Select teacher...</option>
                 {teachers.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.displayName ?? t.email}
@@ -396,14 +396,14 @@ export default function AdminDashboardPage() {
               </select>
               {teachers.length === 0 && (
                 <p className="text-xs text-neutral-500">
-                  Avval 1-qadamda o{"'"}qituvchi yarating.
+                  Create a teacher first in step 1.
                 </p>
               )}
             </label>
 
             <label className="space-y-1 text-sm">
               <span className="font-medium text-neutral-700 dark:text-neutral-300">
-                Fan
+                Subject
               </span>
               <select
                 value={selectedSubjectId}
@@ -411,7 +411,7 @@ export default function AdminDashboardPage() {
                 disabled={loadingStructure}
                 className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
               >
-                <option value="">Fan tanlang&hellip;</option>
+                <option value="">Select subject...</option>
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
@@ -422,7 +422,7 @@ export default function AdminDashboardPage() {
 
             <label className="space-y-1 text-sm">
               <span className="font-medium text-neutral-700 dark:text-neutral-300">
-                Guruh
+                Group
               </span>
               <select
                 value={selectedGroupId}
@@ -430,7 +430,7 @@ export default function AdminDashboardPage() {
                 disabled={loadingStructure || !selectedSubjectId}
                 className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm dark:border-neutral-600 dark:bg-neutral-950"
               >
-                <option value="">Guruh tanlang&hellip;</option>
+                <option value="">Select group...</option>
                 {groups.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}
@@ -449,7 +449,7 @@ export default function AdminDashboardPage() {
             }
             className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-blue-600"
           >
-            {assigning ? "Biriktirilmoqda\u2026" : "O\u2018qituvchini guruhga biriktirish"}
+            {assigning ? "Assigning..." : "Assign teacher to group"}
           </button>
         </form>
       </section>
