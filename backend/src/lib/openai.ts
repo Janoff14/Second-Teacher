@@ -42,7 +42,10 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
 }
 
 export function hasOpenAI(): boolean {
-  return !!env.OPENAI_API_KEY;
+  const key = env.OPENAI_API_KEY?.trim();
+  if (!key) return false;
+  // Reject obviously malformed keys early so callers can surface clearer errors.
+  return key.startsWith("sk-");
 }
 
 const BRIEFING_MODEL = "gpt-4o-mini";

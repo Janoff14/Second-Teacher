@@ -85,9 +85,7 @@ function isChapterHeading(line: string): boolean {
   return (
     /^#{1,6}\s+\S/.test(trimmed) ||
     /^chapter\s+(\d+|[ivxlcdm]+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b([:\s-].*)?$/i.test(normalized) ||
-    /^(unit|lesson|part)\s+\d+([:\s-].*)?$/i.test(normalized) ||
-    /^\d{1,2}([.)]|[\s:-])\s*[A-Z][A-Za-z0-9 ,'"()\-]{4,}$/.test(normalized) ||
-    /^[A-Z][A-Z0-9 ,'"()\-]{7,}$/.test(normalized)
+    /^(unit|lesson|part)\s+\d+([:\s-].*)?$/i.test(normalized)
   );
 }
 
@@ -97,6 +95,35 @@ function cleanChapterHeading(line: string): string {
     return trimmed.replace(/^#{1,6}\s+/, "");
   }
   return trimmed;
+}
+
+function normalizeSpacedCapsWord(word: string): string {
+  const letters = word.replace(/\s+/g, "");
+  if (/^[A-Z]{3,}$/.test(letters) && word.includes(" ")) {
+    return letters;
+  }
+  return word;
+}
+
+function normalizeDetectedHeading(raw: string): string {
+  const normalized = raw
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((word) => normalizeSpacedCapsWord(word))
+    .join(" ")
+    .replace(/[|]{2,}/g, "|")
+    .trim();
+  return normalized;
+}
+
+function isLikelyNoisyHeading(title: string): boolean {
+  if (!title) return true;
+  if (title.length < 3 || title.length > 90) return true;
+  if (/https?:\/\//i.test(title)) return true;
+  if ((title.match(/\d/g) ?? []).length > Math.max(8, Math.floor(title.length * 0.35))) return true;
+  if ((title.match(/[,:;(){}\[\]|]/g) ?? []).length > Math.floor(title.length * 0.2)) return true;
+  return false;
 }
 
 function splitChapterBlocks(text: string): Array<{ title: string; body: string }> {
@@ -205,13 +232,17 @@ function buildChapterStartsFromPages(pageTexts: TextbookPageText[]): ChapterStar
       .split("\n")
       .map((line) => line.trim())
       .filter(Boolean)
-      .slice(0, 10);
+      .slice(0, 6);
     const match = lines.find((line) => isChapterHeading(line));
     if (!match) {
       continue;
     }
+    const title = normalizeDetectedHeading(cleanChapterHeading(match));
+    if (isLikelyNoisyHeading(title)) {
+      continue;
+    }
     starts.push({
-      title: cleanChapterHeading(match),
+      title,
       startPage: page.pageNumber,
     });
   }

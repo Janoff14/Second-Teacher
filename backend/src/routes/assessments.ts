@@ -27,6 +27,7 @@ import { indexPublishedAssessmentVersion, getTextbookSourceById } from "../domai
 import { buildTeacherBriefingPayload } from "../domain/teacherBriefing";
 import { appendAuditLog } from "../domain/auditStore";
 import { getUserById } from "../domain/userStore";
+import { hasOpenAI } from "../lib/openai";
 import {
   generateTestFromTextbook,
   listTextbookChapters,
@@ -182,9 +183,12 @@ assessmentsRouter.post(
       });
 
       if (result.items.length === 0) {
-        const err = new Error("Could not generate questions from the selected topics. Try broader topics or a different textbook.") as Error & { statusCode?: number; code?: string };
+        const message = hasOpenAI()
+          ? "Could not generate questions from the selected chapters/topics. Try different chapter selections or broader topics."
+          : "AI generation is currently unavailable on the server (OpenAI API key is missing/invalid). Please update backend OPENAI_API_KEY in Railway.";
+        const err = new Error(message) as Error & { statusCode?: number; code?: string };
         err.statusCode = 422;
-        err.code = "GENERATION_FAILED";
+        err.code = hasOpenAI() ? "GENERATION_FAILED" : "AI_UNAVAILABLE";
         throw err;
       }
 
