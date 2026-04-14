@@ -19,6 +19,9 @@ node_modules/
 dist/
 coverage/
 
+# Vercel CLI (monorepo deploy from repo root)
+.vercel/
+
 # Frontend (when added)
 frontend/node_modules/
 frontend/dist/
