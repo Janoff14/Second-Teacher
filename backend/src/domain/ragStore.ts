@@ -494,6 +494,36 @@ export interface RetrievalHit {
   citation: RetrievalCitation;
 }
 
+export function listTextbookRetrievalHits(params: {
+  subjectId: string;
+  textbookSourceId: string;
+}): RetrievalHit[] {
+  const out: RetrievalHit[] = [];
+  for (const chunk of chunks) {
+    if (!chunk.active) continue;
+    if (chunk.sourceType !== "textbook") continue;
+    if (chunk.subjectId !== params.subjectId) continue;
+    if (chunk.textbookSourceId !== params.textbookSourceId) continue;
+    const citation: RetrievalCitation = {
+      anchor: chunk.citationAnchor,
+      sourceType: chunk.sourceType,
+      subjectId: chunk.subjectId,
+      chunkIndex: chunk.chunkIndex,
+      ...(chunk.textbookSourceId !== undefined ? { textbookSourceId: chunk.textbookSourceId } : {}),
+      ...(chunk.textbookLocation !== undefined ? { textbookLocation: chunk.textbookLocation } : {}),
+      ...(chunk.readerPath !== undefined ? { readerPath: chunk.readerPath } : {}),
+      ...(chunk.highlightText !== undefined ? { highlightText: chunk.highlightText } : {}),
+    };
+    out.push({
+      chunkId: chunk.id,
+      text: chunk.text,
+      score: 0,
+      citation,
+    });
+  }
+  return out.sort((a, b) => a.citation.chunkIndex - b.citation.chunkIndex);
+}
+
 function canAccessChunk(chunk: CorpusChunk, groupId: string, subjectId: string): boolean {
   if (!chunk.active) {
     return false;

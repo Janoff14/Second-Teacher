@@ -2,6 +2,7 @@ import { logger } from "../config/logger";
 import { briefCompletion, hasOpenAI } from "../lib/openai";
 import {
   queryCorpus,
+  listTextbookRetrievalHits,
   listTextbookSourcesForSubject,
   getTextbookReaderDocument,
   type RetrievalHit,
@@ -95,6 +96,25 @@ async function retrieveTopicChunks(params: {
   }
 
   return allHits.sort((a, b) => b.score - a.score);
+}
+
+function rankChapterHitsByTopics(hits: RetrievalHit[], topics: string[]): RetrievalHit[] {
+  const terms = topics
+    .flatMap((topic) => topic.toLowerCase().split(/[^a-z0-9]+/))
+    .map((term) => term.trim())
+    .filter((term) => term.length >= 3);
+  if (terms.length === 0) {
+    return hits;
+  }
+  const score = (text: string): number => {
+    const lower = text.toLowerCase();
+    let count = 0;
+    for (const term of terms) {
+      if (lower.includes(term)) count += 1;
+    }
+    return count;
+  };
+  return [...hits].sort((a, b) => score(b.text) - score(a.text));
 }
 
 function buildPrompt(params: {
@@ -246,43 +266,52 @@ export async function generateTestFromTextbook(
     chapterNumbers: selectedChapters,
     topKPerTopic: Math.max(6, Math.ceil(questionCount / Math.max(retrievalQueries.length, 1)) + 6),
   });
+  let selectedChunks = chunks;
+  if (selectedChunks.length === 0 && selectedChapters.length > 0) {
+    const chapterSet = new Set(selectedChapters);
+    const chapterHits = listTextbookRetrievalHits({ subjectId, textbookSourceId }).filter((hit) => {
+      const chapter = hit.citation.textbookLocation?.chapterNumber;
+      return chapter !== undefined && chapterSet.has(chapter);
+    });
+    selectedChunks = rankChapterHitsByTopics(chapterHits, topics);
+  }
 
-  if (chunks.length === 0) {
+  if (selectedChunks.length === 0) {
     return { items: [], topicsUsed: topics, chunksRetrieved: 0 };
   }
 
   if (!hasOpenAI()) {
     logger.info("ai_test_gen_no_openai_using_fallback");
-    const items = generateFallbackItems(chunks, questionCount);
-    return { items, topicsUsed: retrievalQueries, chunksRetrieved: chunks.length };
+    const items = generateFallbackItems(selectedChunks, questionCount);
+    return { items, topicsUsed: retrievalQueries, chunksRetrieved: selectedChunks.length };
   }
 
-  const prompt = buildPrompt({ topics, questionCount, difficulty, chunks });
+  const prompt = buildPrompt({ topics: retrievalQueries, questionCount, difficulty, chunks: selectedChunks });
 
   try {
     const raw = await briefCompletion(prompt.system, prompt.user, 2000);
     if (!raw) {
       logger.warn("ai_test_gen_empty_response");
-      const items = generateFallbackItems(chunks, questionCount);
-      return { items, topicsUsed: retrievalQueries, chunksRetrieved: chunks.length };
+      const items = generateFallbackItems(selectedChunks, questionCount);
+      return { items, topicsUsed: retrievalQueries, chunksRetrieved: selectedChunks.length };
     }
 
-    const items = parseGeneratedItems(raw, chunks);
+    const items = parseGeneratedItems(raw, selectedChunks);
     if (items.length === 0) {
       logger.warn("ai_test_gen_no_valid_items_parsed");
-      const fallback = generateFallbackItems(chunks, questionCount);
-      return { items: fallback, topicsUsed: retrievalQueries, chunksRetrieved: chunks.length };
+      const fallback = generateFallbackItems(selectedChunks, questionCount);
+      return { items: fallback, topicsUsed: retrievalQueries, chunksRetrieved: selectedChunks.length };
     }
 
     logger.info(
-      { requested: questionCount, generated: items.length, chunks: chunks.length },
+      { requested: questionCount, generated: items.length, chunks: selectedChunks.length },
       "ai_test_gen_success",
     );
-    return { items, topicsUsed: retrievalQueries, chunksRetrieved: chunks.length };
+    return { items, topicsUsed: retrievalQueries, chunksRetrieved: selectedChunks.length };
   } catch (err) {
     logger.error({ err }, "ai_test_gen_llm_failed");
-    const items = generateFallbackItems(chunks, questionCount);
-    return { items, topicsUsed: retrievalQueries, chunksRetrieved: chunks.length };
+    const items = generateFallbackItems(selectedChunks, questionCount);
+    return { items, topicsUsed: retrievalQueries, chunksRetrieved: selectedChunks.length };
   }
 }
 
