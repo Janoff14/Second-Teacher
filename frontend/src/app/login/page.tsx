@@ -21,19 +21,52 @@ function ErrorBox({ message }: { message: string | null }) {
   );
 }
 
-type RoleHint = "teacher" | "admin" | null;
+type RoleHint = "teacher" | "student" | "admin" | null;
 
 function roleHeading(hint: RoleHint): string {
   if (hint === "teacher") return "O\u2018qituvchi sifatida kirish";
+  if (hint === "student") return "Talaba sifatida kirish";
   if (hint === "admin") return "Administrator sifatida kirish";
   return "Kirish";
 }
 
 function roleDescription(hint: RoleHint): string {
   if (hint === "teacher")
-    return "Admin tomonidan berilgan ism familya, email va parol bilan kiring.";
+    return "Admin tomonidan berilgan email va parol bilan kiring.";
+  if (hint === "student") return "Talaba demo akkaunti bilan kiring.";
   if (hint === "admin") return "Administrator email va parol bilan kiring.";
   return "Email va parol bilan kiring.";
+}
+
+function demoAccountsForRole(hint: RoleHint): Array<{ role: string; email: string; password: string }> {
+  if (hint === "student") {
+    return [
+      {
+        role: "Student",
+        email: "lila.kim_demo@secondteacher.dev",
+        password: "DemoSeed2026!",
+      },
+    ];
+  }
+  if (hint === "teacher") {
+    return [
+      {
+        role: "Teacher",
+        email: "kamila.saidova_demo@secondteacher.dev",
+        password: "DemoSeed2026!",
+      },
+    ];
+  }
+  if (hint === "admin") {
+    return [
+      {
+        role: "Admin",
+        email: "admin@secondteacher.dev",
+        password: "ChangeMe123!",
+      },
+    ];
+  }
+  return [];
 }
 
 function roleGradient(hint: RoleHint): string {
@@ -47,10 +80,9 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const sessionExpired = searchParams.get("session") === "expired";
   const roleHint = (searchParams.get("role") as RoleHint) ?? null;
-  const isTeacher = roleHint === "teacher";
+  const demoAccounts = demoAccountsForRole(roleHint);
   const setSession = useAuthStore((s) => s.setSession);
 
-  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -118,30 +150,23 @@ function LoginContent() {
             </p>
           )}
 
+          {demoAccounts.length > 0 ? (
+            <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs leading-relaxed text-blue-900 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-200">
+              <span className="font-semibold">Demo account</span>: test uchun tayyor ma&apos;lumotli
+              akkaunt.
+              <ul className="mt-2 space-y-1 font-mono">
+                {demoAccounts.map((account) => (
+                  <li key={account.email}>
+                    {account.role}: {account.email} / {account.password}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <ErrorBox message={error} />
 
           <form onSubmit={handleLogin} className="mt-7 space-y-5">
-            {isTeacher && (
-              <div>
-                <label
-                  htmlFor="displayName"
-                  className="block text-sm font-semibold text-foreground/80"
-                >
-                  Ism Familya
-                </label>
-                <input
-                  id="displayName"
-                  type="text"
-                  autoComplete="name"
-                  placeholder="Abdullayev Jasur"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-foreground/15 bg-background px-4 py-2.5 text-sm text-foreground transition-colors placeholder:text-foreground/40"
-                  disabled={loading}
-                  required
-                />
-              </div>
-            )}
             <div>
               <label
                 htmlFor="email"
