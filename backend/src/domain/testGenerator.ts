@@ -269,11 +269,15 @@ export async function generateTestFromTextbook(
   let selectedChunks = chunks;
   if (selectedChunks.length === 0 && selectedChapters.length > 0) {
     const chapterSet = new Set(selectedChapters);
-    const chapterHits = listTextbookRetrievalHits({ subjectId, textbookSourceId }).filter((hit) => {
+    const sourceHits = listTextbookRetrievalHits({ subjectId, textbookSourceId });
+    const chapterHits = sourceHits.filter((hit) => {
       const chapter = hit.citation.textbookLocation?.chapterNumber;
       return chapter !== undefined && chapterSet.has(chapter);
     });
-    selectedChunks = rankChapterHitsByTopics(chapterHits, topics);
+    selectedChunks =
+      chapterHits.length > 0
+        ? rankChapterHitsByTopics(chapterHits, topics)
+        : rankChapterHitsByTopics(sourceHits, topics);
   }
 
   if (selectedChunks.length === 0) {
