@@ -263,9 +263,15 @@ export async function extractTextFromUploadedDocument(
   switch (ext) {
     case ".pdf": {
       sourceFormat = "pdf";
-      const extracted = await extractPdfDocument(file.buffer);
-      rawText = extracted.text;
-      readerSeed = extracted.readerSeed;
+      try {
+        const extracted = await extractPdfDocument(file.buffer);
+        rawText = extracted.text;
+        readerSeed = extracted.readerSeed;
+      } catch {
+        // Fallback for PDFs that fail deep page/outline parsing in pdfjs.
+        // This keeps upload usable and searchable, even if reader seed is unavailable.
+        rawText = await extractPdfText(file.buffer);
+      }
       break;
     }
     case ".docx":
