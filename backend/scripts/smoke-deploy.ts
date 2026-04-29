@@ -16,7 +16,7 @@ if (!base) {
 }
 
 const email = process.env.SMOKE_EMAIL ?? "admin@secondteacher.dev";
-const password = process.env.SMOKE_PASSWORD ?? "ChangeMe123!";
+const password = process.env.SMOKE_PASSWORD;
 
 async function main() {
   const healthUrl = `${base}/health`;
@@ -27,6 +27,11 @@ async function main() {
     process.exit(1);
   }
   console.log("OK GET /health", healthBody.slice(0, 120));
+
+  if (!password) {
+    console.log("Skipping POST /auth/login because SMOKE_PASSWORD is not set.");
+    return;
+  }
 
   const loginRes = await fetch(`${base}/auth/login`, {
     method: "POST",

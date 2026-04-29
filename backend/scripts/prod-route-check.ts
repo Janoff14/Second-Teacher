@@ -10,6 +10,12 @@ if (!BASE) {
   console.error("Set API_BASE_URL");
   process.exit(1);
 }
+const adminPassword = process.env.ADMIN_PASSWORD;
+const teacherPassword = process.env.TEACHER_PASSWORD;
+if (!adminPassword || !teacherPassword) {
+  console.error("Set ADMIN_PASSWORD and TEACHER_PASSWORD for route checks.");
+  process.exit(1);
+}
 
 type Row = { route: string; status: number; ok: boolean; note?: string };
 const rows: Row[] = [];
@@ -49,7 +55,7 @@ async function main() {
   const loginRes = await req("POST", "/auth/login", {
     expect: 200,
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ email: "admin@secondteacher.dev", password: "ChangeMe123!" }),
+    body: JSON.stringify({ email: "admin@secondteacher.dev", password: adminPassword }),
   });
   const loginJson = (await loginRes.json()) as { data?: { token?: string } };
   const adminToken = loginJson.data?.token;
@@ -128,7 +134,7 @@ async function main() {
     const tLogin = await req("POST", "/auth/login", {
       expect: 200,
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" }),
+      body: JSON.stringify({ email: "teacher@secondteacher.dev", password: teacherPassword }),
     });
     const tJson = (await tLogin.json()) as { data?: { token?: string } };
     record("POST /auth/login (teacher)", tLogin.status, Boolean(tJson.data?.token));

@@ -1,5 +1,9 @@
 $ErrorActionPreference = "Stop"
 $base = "https://second-teacher-production.up.railway.app"
+$teacherPassword = $env:TEACHER_PASSWORD
+if (-not $teacherPassword) {
+    throw "Set TEACHER_PASSWORD before running this script."
+}
 
 function Api {
     param([string]$Method, [string]$Path, [object]$Body, [string]$Token)
@@ -19,7 +23,7 @@ function Api {
 }
 
 Write-Host "`n=== 1. Login as teacher ==="
-$login = Api -Method POST -Path "/auth/login" -Body @{ email = "teacher@secondteacher.dev"; password = "ChangeMe123!" }
+$login = Api -Method POST -Path "/auth/login" -Body @{ email = "teacher@secondteacher.dev"; password = $teacherPassword }
 $token = $login.data.token
 Write-Host "Logged in as $($login.data.user.email) (role: $($login.data.user.role))"
 

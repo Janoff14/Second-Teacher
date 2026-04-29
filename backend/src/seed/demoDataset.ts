@@ -51,14 +51,23 @@ import {
   loadTextbooksFromDb,
   resetRagStoreForTest,
 } from "../domain/ragStore";
-import { createUser, getUserByEmail } from "../domain/userStore";
+import { createUser, getUserByEmail, TEST_DEMO_USER_PASSWORD } from "../domain/userStore";
 import { resetRateLimitForTest } from "../middleware/rateLimit";
 
 export const DEMO_SEED_SUBJECT_NAME = "Fundamentals of Physics";
 /** Login for the roster demo; also seeded in `seedDefaultUsers` when present. */
 export const DEMO_SEED_TEACHER_EMAIL = "kamila.saidova_demo@secondteacher.dev";
 export const DEMO_SEED_TEACHER_DISPLAY_NAME = "Kamila Saidova_demo";
-export const DEMO_STUDENT_PASSWORD = "DemoSeed2026!";
+function resolveDemoStudentPassword(): string {
+  if (env.DEMO_STUDENT_PASSWORD) return env.DEMO_STUDENT_PASSWORD;
+  if (env.NODE_ENV === "test") return TEST_DEMO_USER_PASSWORD;
+  if (env.SEED_DEMO_DATA) {
+    throw new Error("DEMO_STUDENT_PASSWORD is required when SEED_DEMO_DATA is enabled.");
+  }
+  return "";
+}
+
+export const DEMO_STUDENT_PASSWORD = resolveDemoStudentPassword();
 /** Total synthetic students generated for the demo roster when using default seed options. */
 export const DEMO_STUDENT_COUNT = 30;
 

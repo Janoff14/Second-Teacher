@@ -37,13 +37,12 @@ function roleDescription(hint: RoleHint): string {
   return "Use your email and password.";
 }
 
-function demoAccountsForRole(hint: RoleHint): Array<{ role: string; email: string; password: string }> {
+function demoAccountsForRole(hint: RoleHint): Array<{ role: string; email: string }> {
   if (hint === "student") {
     return [
       {
         role: "Student",
         email: "lila.kim_demo@secondteacher.dev",
-        password: "DemoSeed2026!",
       },
     ];
   }
@@ -52,7 +51,6 @@ function demoAccountsForRole(hint: RoleHint): Array<{ role: string; email: strin
       {
         role: "Teacher",
         email: "kamila.saidova_demo@secondteacher.dev",
-        password: "DemoSeed2026!",
       },
     ];
   }
@@ -61,7 +59,6 @@ function demoAccountsForRole(hint: RoleHint): Array<{ role: string; email: strin
       {
         role: "Admin",
         email: "admin@secondteacher.dev",
-        password: "ChangeMe123!",
       },
     ];
   }
@@ -159,12 +156,11 @@ function LoginContent() {
 
       {demoAccounts.length > 0 ? (
         <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs leading-relaxed text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/20 dark:text-blue-100">
-          <span className="font-semibold">Demo account</span>: use this pre-filled account to test the
-          platform with existing data.
+          <span className="font-semibold">Demo account</span>: use this account with the password configured for your environment.
           <ul className="mt-2 space-y-1 font-mono">
             {demoAccounts.map((account) => (
               <li key={account.email}>
-                {account.role}: {account.email} / {account.password}
+                {account.role}: {account.email}
               </li>
             ))}
           </ul>

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import bcrypt from "bcryptjs";
+import { env } from "../config/env";
 import { logger } from "../config/logger";
 import { HttpError } from "../lib/httpError";
 import { getSupabaseServiceRoleClient } from "../lib/supabase";
@@ -24,6 +25,8 @@ const USER_SELECT = "id, email, password_hash, role, display_name";
 const USER_SELECT_NO_NAME = "id, email, password_hash, role";
 const USER_PUBLIC_SELECT = "id, email, role, display_name";
 const USER_PUBLIC_SELECT_NO_NAME = "id, email, role";
+export const TEST_DEFAULT_USER_PASSWORD = "test-only-default-password";
+export const TEST_DEMO_USER_PASSWORD = "test-only-demo-password";
 
 function nextId(): string {
   const id = `u_${idCounter}`;
@@ -284,21 +287,56 @@ export async function verifyPassword(record: UserRecord, password: string): Prom
 }
 
 export async function seedDefaultUsers(): Promise<void> {
-  const defaults: Array<{ email: string; password: string; role: Role; displayName?: string | null }> = [
-    { email: "admin@secondteacher.dev", password: "ChangeMe123!", role: "admin", displayName: "Demo Admin" },
-    { email: "z9k.admin@secondteacher.dev", password: "qwerty123", role: "admin", displayName: "Extra Admin" },
-    { email: "teacher@secondteacher.dev", password: "ChangeMe123!", role: "teacher", displayName: "Demo Teacher" },
-    /** Roster demo owner; same password as seed students — sync with `DEMO_SEED_TEACHER_EMAIL` in `seed/demoDataset.ts`. */
+  if (!env.SEED_DEFAULT_USERS) {
+    logger.info("seed_default_users_disabled");
+    return;
+  }
+
+  const testPassword = env.NODE_ENV === "test" ? TEST_DEFAULT_USER_PASSWORD : undefined;
+  const testDemoPassword = env.NODE_ENV === "test" ? TEST_DEMO_USER_PASSWORD : undefined;
+  const defaults: Array<{ email: string; password: string | undefined; role: Role; displayName?: string | null }> = [
+    {
+      email: "admin@secondteacher.dev",
+      password: env.DEFAULT_ADMIN_PASSWORD ?? testPassword,
+      role: "admin",
+      displayName: "Demo Admin",
+    },
+    ...(env.EXTRA_ADMIN_PASSWORD
+      ? [
+          {
+            email: "z9k.admin@secondteacher.dev",
+            password: env.EXTRA_ADMIN_PASSWORD,
+            role: "admin" as Role,
+            displayName: "Extra Admin",
+          },
+        ]
+      : []),
+    {
+      email: "teacher@secondteacher.dev",
+      password: env.DEFAULT_TEACHER_PASSWORD ?? testPassword,
+      role: "teacher",
+      displayName: "Demo Teacher",
+    },
+    /** Roster demo owner; same password as seed students, configured with `DEMO_STUDENT_PASSWORD`. */
     {
       email: "kamila.saidova_demo@secondteacher.dev",
-      password: "DemoSeed2026!",
+      password: env.DEMO_STUDENT_PASSWORD ?? testDemoPassword,
       role: "teacher",
       displayName: "Kamila Saidova_demo",
     },
-    { email: "student@secondteacher.dev", password: "ChangeMe123!", role: "student", displayName: null },
+    {
+      email: "student@secondteacher.dev",
+      password: env.DEFAULT_STUDENT_PASSWORD ?? testPassword,
+      role: "student",
+      displayName: null,
+    },
   ];
 
   for (const u of defaults) {
+    if (!u.password) {
+      logger.warn({ email: u.email }, "seed_user_skipped_missing_password");
+      continue;
+    }
     const existing = await getUserByEmail(u.email);
     if (!existing) {
       try {

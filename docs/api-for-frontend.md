@@ -89,13 +89,13 @@ For **400** validation, `message` often starts with `Invalid request body: …`.
 
 ### Seeded users (dev / fresh deploy)
 
-After server start, these exist until data is cleared or persistence is added:
+After server start, these exist until data is cleared or persistence is added. Passwords come from environment variables; tests use isolated fixture values.
 
-- `admin@secondteacher.dev` / `ChangeMe123!`
-- `teacher@secondteacher.dev` / `ChangeMe123!`
-- `student@secondteacher.dev` / `ChangeMe123!`
+- `admin@secondteacher.dev` / `DEFAULT_ADMIN_PASSWORD`
+- `teacher@secondteacher.dev` / `DEFAULT_TEACHER_PASSWORD`
+- `student@secondteacher.dev` / `DEFAULT_STUDENT_PASSWORD`
 
-**Change passwords in production** before real users rely on the system.
+Default user seeding is disabled in production unless `SEED_DEFAULT_USERS=true`.
 
 ### Protected routes
 

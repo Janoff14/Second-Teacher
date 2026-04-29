@@ -4,6 +4,7 @@ import { z } from "zod";
 dotenv.config();
 
 const emptyToUndefined = (v: unknown) => (v === "" || v === undefined ? undefined : v);
+const envBoolean = (v: unknown) => v === true || v === "true" || v === "1" || v === "yes" || v === "YES";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -30,13 +31,20 @@ const envSchema = z.object({
    */
   SUPABASE_SERVICE_ROLE_KEY: z.preprocess(emptyToUndefined, z.string().optional()),
   /**
+   * Seeds local/demo users at startup. Defaults to enabled only in tests.
+   * Development and production deployments must opt in explicitly and provide passwords below.
+   */
+  SEED_DEFAULT_USERS: z.preprocess(envBoolean, z.boolean().optional()),
+  DEFAULT_ADMIN_PASSWORD: z.preprocess(emptyToUndefined, z.string().min(12).optional()),
+  EXTRA_ADMIN_PASSWORD: z.preprocess(emptyToUndefined, z.string().min(12).optional()),
+  DEFAULT_TEACHER_PASSWORD: z.preprocess(emptyToUndefined, z.string().min(12).optional()),
+  DEFAULT_STUDENT_PASSWORD: z.preprocess(emptyToUndefined, z.string().min(12).optional()),
+  DEMO_STUDENT_PASSWORD: z.preprocess(emptyToUndefined, z.string().min(12).optional()),
+  /**
    * When true, loads modular fake data from `src/seed/demoDataset.ts` at server startup.
    * Never enable in production unless you intend a throwaway demo dataset.
    */
-  SEED_DEMO_DATA: z.preprocess(
-    (v) => v === true || v === "true" || v === "1" || v === "yes" || v === "YES",
-    z.boolean().optional(),
-  ),
+  SEED_DEMO_DATA: z.preprocess(envBoolean, z.boolean().optional()),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -46,11 +54,15 @@ if (!parsed.success) {
   throw new Error(`Invalid environment configuration: ${fields}`);
 }
 
-const seedDemoDataDefault = parsed.data.NODE_ENV !== "production";
+const seedDemoDataDefault = parsed.data.NODE_ENV === "test";
 const seedDemoData =
   process.env.SEED_DEMO_DATA === undefined ? seedDemoDataDefault : (parsed.data.SEED_DEMO_DATA ?? false);
+const seedDefaultUsersDefault = parsed.data.NODE_ENV === "test";
+const seedDefaultUsers =
+  process.env.SEED_DEFAULT_USERS === undefined ? seedDefaultUsersDefault : (parsed.data.SEED_DEFAULT_USERS ?? false);
 
 export const env = {
   ...parsed.data,
+  SEED_DEFAULT_USERS: seedDefaultUsers,
   SEED_DEMO_DATA: seedDemoData,
 };

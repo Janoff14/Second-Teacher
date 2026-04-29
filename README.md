@@ -34,12 +34,12 @@ Second Teacher is an EdTech platform built for **teachers**, **students**, and *
 
 ## Try the Demo
 
-The live app is pre-loaded with a Physics 101 class. Sign in with these demo accounts:
+The live app is pre-loaded with a Physics 101 class. Sign in with demo accounts using the password configured in the deployment environment:
 
-| Role | Email | Password |
-|------|-------|----------|
-| **Teacher** | `kamila.saidova_demo@secondteacher.dev` | `DemoSeed2026!` |
-| **Student** | `lila.kim_demo@secondteacher.dev` | `DemoSeed2026!` |
+| Role | Email |
+|------|-------|
+| **Teacher** | `kamila.saidova_demo@secondteacher.dev` |
+| **Student** | `lila.kim_demo@secondteacher.dev` |
 
 See [all demo accounts](docs/demo-seed-accounts.md) for the full roster.
 

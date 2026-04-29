@@ -46,8 +46,8 @@ export default function HomePage() {
               already filled with data.
             </p>
             <ul className="mt-3 space-y-1 font-mono text-xs sm:text-sm">
-              <li>Student: lila.kim_demo@secondteacher.dev / DemoSeed2026!</li>
-              <li>Teacher: kamila.saidova_demo@secondteacher.dev / DemoSeed2026!</li>
+              <li>Student: lila.kim_demo@secondteacher.dev</li>
+              <li>Teacher: kamila.saidova_demo@secondteacher.dev</li>
             </ul>
           </div>
           <RoleEntryCards />

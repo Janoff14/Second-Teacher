@@ -6,7 +6,7 @@ import { resetAssessmentStoreForTest } from "../src/domain/assessmentStore";
 import { resetInsightsStoreForTest } from "../src/domain/insightsStore";
 import { resetAuditStoreForTest } from "../src/domain/auditStore";
 import { resetRagStoreForTest } from "../src/domain/ragStore";
-import { resetUsersForTest, seedDefaultUsers } from "../src/domain/userStore";
+import { TEST_DEFAULT_USER_PASSWORD, resetUsersForTest, seedDefaultUsers } from "../src/domain/userStore";
 import { resetRateLimitForTest } from "../src/middleware/rateLimit";
 
 describe("backend bootstrap and auth/rbac baseline", () => {
@@ -46,7 +46,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const loginRes = await request(app)
       .post("/auth/login")
-      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "teacher@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
 
     expect(loginRes.status).toBe(200);
     expect(loginRes.body.data.token).toBeTruthy();
@@ -64,7 +64,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const adminLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "admin@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "admin@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const adminToken = adminLogin.body.data.token as string;
 
     const createRes = await request(app)
@@ -91,7 +91,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const loginRes = await request(app)
       .post("/auth/login")
-      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "teacher@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const token = loginRes.body.data.token as string;
 
     const emptyScope = await request(app)
@@ -127,7 +127,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const loginRes = await request(app)
       .post("/auth/login")
-      .send({ email: "student@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "student@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
 
     const token = loginRes.body.data.token as string;
 
@@ -143,7 +143,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const teacherLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "teacher@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const teacherToken = teacherLogin.body.data.token as string;
 
     const subjectRes = await request(app)
@@ -182,7 +182,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const teacherLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "teacher@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const teacherToken = teacherLogin.body.data.token as string;
 
     const subjectRes = await request(app)
@@ -292,7 +292,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const teacherLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "teacher@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const teacherToken = teacherLogin.body.data.token as string;
 
     const subjectRes = await request(app)
@@ -361,7 +361,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const teacherLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "teacher@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const teacherToken = teacherLogin.body.data.token as string;
 
     const subjectRes = await request(app)
@@ -495,7 +495,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const teacherLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "teacher@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const teacherToken = teacherLogin.body.data.token as string;
 
     const subjectRes = await request(app)
@@ -672,7 +672,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const teacherLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "teacher@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const teacherToken = teacherLogin.body.data.token as string;
 
     const subjectRes = await request(app)
@@ -726,7 +726,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const teacherLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "teacher@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const teacherToken = teacherLogin.body.data.token as string;
 
     const subjectRes = await request(app)
@@ -778,7 +778,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
 
     const adminLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "admin@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "admin@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const adminToken = adminLogin.body.data.token as string;
     const audits = await request(app).get("/audit/logs").set("Authorization", `Bearer ${adminToken}`);
     expect(audits.status).toBe(200);
@@ -790,7 +790,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const teacherLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "teacher@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const teacherToken = teacherLogin.body.data.token as string;
 
     const subjectRes = await request(app)
@@ -822,7 +822,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
 
     const adminLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "admin@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "admin@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const adminToken = adminLogin.body.data.token as string;
     const logs = await request(app)
       .get("/audit/logs?action=ANALYTICS_RISK_VIEW")
@@ -839,7 +839,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const adminLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "admin@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "admin@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const adminToken = adminLogin.body.data.token as string;
 
     const registerRes = await request(app).post("/auth/register").send({
@@ -934,7 +934,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
 
     const studentLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "student@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "student@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const studentToken = studentLogin.body.data.token as string;
 
     const studentScope = await request(app)
@@ -945,7 +945,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
 
     const adminLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "admin@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "admin@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const adminToken = adminLogin.body.data.token as string;
     const adminStudentScope = await request(app)
       .get("/protected/student")
@@ -960,7 +960,7 @@ describe("backend bootstrap and auth/rbac baseline", () => {
     const app = createApp();
     const teacherLogin = await request(app)
       .post("/auth/login")
-      .send({ email: "teacher@secondteacher.dev", password: "ChangeMe123!" });
+      .send({ email: "teacher@secondteacher.dev", password: TEST_DEFAULT_USER_PASSWORD });
     const teacherToken = teacherLogin.body.data.token as string;
 
     const subjectsEmpty = await request(app).get("/subjects").set("Authorization", `Bearer ${teacherToken}`);
